@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import LeftSidebar from '@/components/leftSidebar/LeftSidebar';
-import MainApp from '@/components/mainApp/MainApp';
+import LeftSidebar from '@/components/views/LeftSidebar';
+import MainApp from '@/components/views/MainApp';
 import { projectsAPI } from '@/lib/api-client';
 
 export default function Home() {

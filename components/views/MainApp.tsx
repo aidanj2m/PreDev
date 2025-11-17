@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import AddressInputContainer from '@/components/address-input/AddressInputContainer';
-import AddressList from '@/components/address-list/AddressList';
-import MapView from '@/components/map-view/MapView';
+import AddressInputContainer from '@/components/modals/AddressInputContainer';
+import AddressList from '@/components/modals/AddressList';
+import MapView from './MapView';
 import { Address, projectsAPI, addressesAPI } from '@/lib/api-client';
 
 type ViewState = 'input' | 'building' | 'viewing';
@@ -42,7 +42,8 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         setViewState('input');
         setShowInput(true);
       } else {
-        setViewState('building');
+        // Go straight to map view for existing projects
+        setViewState('viewing');
         setShowInput(false);
       }
     } catch (error) {
@@ -70,9 +71,38 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
       setAddresses([...addresses, newAddress]);
       
-      // Transition to building state and hide input
+      // Transition to building state and hide input (for assembling more)
       setViewState('building');
       setShowInput(false);
+      
+      // Notify parent to refresh project list
+      onProjectChange();
+    } catch (error) {
+      console.error('Error adding address:', error);
+      alert('Failed to add address. Please try again.');
+    }
+  };
+
+  const handleAddressSubmitted = async (validatedAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    full_address: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    if (!currentProjectId) {
+      console.error('No current project');
+      return;
+    }
+
+    try {
+      const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
+      setAddresses([...addresses, newAddress]);
+      
+      // Go straight to map view (Enter key behavior)
+      setViewState('viewing');
       
       // Notify parent to refresh project list
       onProjectChange();
@@ -112,6 +142,34 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
 
   const handleAddAnother = () => {
     setShowInput(true);
+  };
+
+  const handleAddAddressFromMap = async (validatedAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    full_address: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    if (!currentProjectId) {
+      console.error('No current project');
+      return;
+    }
+
+    try {
+      const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
+      setAddresses([...addresses, newAddress]);
+      
+      // Stay in viewing mode, just refresh the map
+      onProjectChange();
+      
+      console.log('Added address from map:', newAddress);
+    } catch (error) {
+      console.error('Error adding address from map:', error);
+      alert('Failed to add address. Please try again.');
+    }
   };
 
   // If no project selected, show placeholder
@@ -194,7 +252,11 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         overflow: 'hidden',
         backgroundColor: '#f5f5f5'
       }}>
-        <MapView addresses={addresses} onBack={handleBackFromMap} />
+        <MapView 
+          addresses={addresses} 
+          onBack={handleBackFromMap} 
+          onAddAddress={handleAddAddressFromMap}
+        />
       </main>
     );
   }
@@ -238,6 +300,7 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         {showInput && (
           <AddressInputContainer
             onAddressValidated={handleAddressValidated}
+            onAddressSubmitted={handleAddressSubmitted}
             visible={showInput}
             position={viewState === 'building' ? 'top' : 'center'}
           />
@@ -256,3 +319,4 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     </main>
   );
 }
+

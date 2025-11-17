@@ -58,6 +58,20 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+    
+    // Handle 422 validation errors (FastAPI format)
+    if (response.status === 422 && error.detail) {
+      if (Array.isArray(error.detail)) {
+        const errors = error.detail.map((err: any) => {
+          const field = err.loc?.join('.') || 'unknown';
+          return `${field}: ${err.msg}`;
+        }).join(', ');
+        console.error('Validation errors:', error.detail);
+        throw new Error(`Validation error: ${errors}`);
+      }
+      throw new Error(error.detail);
+    }
+    
     throw new Error(error.detail || `API request failed: ${response.status}`);
   }
 
@@ -114,6 +128,8 @@ export const addressesAPI = {
     longitude?: number;
     boundary_geojson?: any;
   }): Promise<Address> {
+    console.log('API Client - Adding address to project:', projectId);
+    console.log('API Client - Address data:', JSON.stringify(address, null, 2));
     return fetchAPI(`/projects/${projectId}/addresses`, {
       method: 'POST',
       body: JSON.stringify(address),
