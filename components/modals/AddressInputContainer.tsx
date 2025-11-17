@@ -111,6 +111,8 @@ export default function AddressInputContainer({
               city: '',
               state: '',
               zip_code: '',
+              latitude: undefined,
+              longitude: undefined,
             });
           });
 
