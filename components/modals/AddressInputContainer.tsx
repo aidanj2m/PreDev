@@ -57,6 +57,12 @@ export default function AddressInputContainer({
   visible,
   position = 'center'
 }: AddressInputContainerProps) {
+  
+  // Rate limiting: prevent duplicate submissions within 10 seconds
+  const lastSubmissionTime = useRef<number>(0);
+  const RATE_LIMIT_MS = 10000; // 10 seconds
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [assembleMode, setAssembleMode] = useState(false);
   const [addressInputs, setAddressInputs] = useState<AddressInput[]>([
     { id: '1', address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
@@ -239,11 +245,34 @@ export default function AddressInputContainer({
     if (e.key === 'Enter') {
       e.preventDefault();
 
+      // Rate limiting check
+      const now = Date.now();
+      const timeSinceLastSubmission = now - lastSubmissionTime.current;
+      
+      if (timeSinceLastSubmission < RATE_LIMIT_MS) {
+        const remainingSeconds = Math.ceil((RATE_LIMIT_MS - timeSinceLastSubmission) / 1000);
+        setError(`Please wait ${remainingSeconds} seconds before submitting another address`);
+        return;
+      }
+
+      // Prevent double submission
+      if (isSubmitting) {
+        setError('Submission in progress, please wait...');
+        return;
+      }
+
       const input = addressInputs.find(inp => inp.id === inputId);
       if (!input) return;
 
       if (input.validatedAddress) {
-        onAddressSubmitted(input.validatedAddress);
+        setIsSubmitting(true);
+        lastSubmissionTime.current = now;
+        
+        try {
+          await onAddressSubmitted(input.validatedAddress);
+        } finally {
+          setIsSubmitting(false);
+        }
         return;
       }
 

@@ -18,6 +18,9 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [showInput, setShowInput] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Rate limiting for submissions
+  const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
 
   // Load project data when project changes
   useEffect(() => {
@@ -67,6 +70,13 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       return;
     }
 
+    // Prevent concurrent submissions
+    if (isSubmittingAddress) {
+      console.log('Submission already in progress, ignoring duplicate request');
+      return;
+    }
+
+    setIsSubmittingAddress(true);
     try {
       const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
       setAddresses([...addresses, newAddress]);
@@ -80,6 +90,8 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     } catch (error) {
       console.error('Error adding address:', error);
       alert('Failed to add address. Please try again.');
+    } finally {
+      setIsSubmittingAddress(false);
     }
   };
 
@@ -97,6 +109,13 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       return;
     }
 
+    // Prevent concurrent submissions
+    if (isSubmittingAddress) {
+      console.log('Submission already in progress, ignoring duplicate request');
+      return;
+    }
+
+    setIsSubmittingAddress(true);
     try {
       const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
       setAddresses([...addresses, newAddress]);
@@ -109,6 +128,8 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     } catch (error) {
       console.error('Error adding address:', error);
       alert('Failed to add address. Please try again.');
+    } finally {
+      setIsSubmittingAddress(false);
     }
   };
 
@@ -152,24 +173,57 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     full_address: string;
     latitude?: number;
     longitude?: number;
+    boundary_geojson?: any;
   }) => {
     if (!currentProjectId) {
       console.error('No current project');
       return;
     }
 
-    try {
-      const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
-      setAddresses([...addresses, newAddress]);
-      
-      // Stay in viewing mode, just refresh the map
-      onProjectChange();
-      
-      console.log('Added address from map:', newAddress);
-    } catch (error) {
-      console.error('Error adding address from map:', error);
-      alert('Failed to add address. Please try again.');
-    }
+    // Create optimistic address with temporary ID
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticAddress: Address = {
+      id: optimisticId,
+      project_id: currentProjectId,
+      street: validatedAddress.street,
+      city: validatedAddress.city,
+      state: validatedAddress.state,
+      zip_code: validatedAddress.zip_code,
+      full_address: validatedAddress.full_address,
+      latitude: validatedAddress.latitude,
+      longitude: validatedAddress.longitude,
+      boundary_geojson: validatedAddress.boundary_geojson,
+      created_at: new Date().toISOString()
+    };
+
+    // Immediately update UI with optimistic address (including boundary)
+    setAddresses([...addresses, optimisticAddress]);
+    console.log('Optimistically added address to UI with boundary:', optimisticAddress);
+
+    // Submit to backend in background
+    addressesAPI.addToProject(currentProjectId, validatedAddress)
+      .then((newAddress) => {
+        // Replace optimistic address with real one from backend
+        setAddresses(prevAddresses => 
+          prevAddresses.map(addr => 
+            addr.id === optimisticId ? newAddress : addr
+          )
+        );
+        console.log('Backend confirmed address:', newAddress);
+        
+        // Notify parent to refresh project list
+        onProjectChange();
+      })
+      .catch((error) => {
+        console.error('Error adding address from map:', error);
+        
+        // Remove optimistic address on failure
+        setAddresses(prevAddresses => 
+          prevAddresses.filter(addr => addr.id !== optimisticId)
+        );
+        
+        alert('Failed to add address. Please try again.');
+      });
   };
 
   // If no project selected, show placeholder
