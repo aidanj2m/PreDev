@@ -17,27 +17,39 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   return (
     <aside style={{
-      width: '280px',
+      width: '260px',
       height: '100vh',
-      backgroundColor: '#f5f5f5',
-      borderRight: '1px solid #e5e5e5',
+      backgroundColor: '#ffffff',
+      borderRight: '1px solid #E5E7EB',
       display: 'flex',
       flexDirection: 'column',
-      padding: '20px 0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif'
+      padding: '24px 0',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      flexShrink: 0
     }}>
       {/* Logo/Title */}
       <div style={{
         padding: '0 24px',
-        marginBottom: '20px'
+        marginBottom: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
       }}>
-        <h1 style={{
-          fontSize: '24px',
-          fontWeight: '600',
-          color: '#000000',
-          margin: 0
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          PreDev
+             <Image src="/PreDevLogo.png" alt="PreDev Logo" width={24} height={24} />
+        </div>
+        <h1 style={{
+          fontSize: '16px',
+          fontWeight: '700',
+          color: '#111827',
+          margin: 0,
+          letterSpacing: '-0.02em'
+        }}>
+          Entitely
         </h1>
       </div>
 
@@ -45,90 +57,78 @@ export default function LeftSidebar({
       <button
         onClick={onCreateProject}
         style={{
-          margin: '0 16px 8px 16px',
-          padding: '8px 8px',
+          margin: '0 24px 16px 24px',
+          padding: '0',
           backgroundColor: 'transparent',
           border: 'none',
-          borderRadius: '8px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
           fontSize: '14px',
           fontWeight: '500',
-          color: '#000000',
+          color: '#3B82F6', // Blue color
           textAlign: 'left',
-          transition: 'background-color 0.2s',
           fontFamily: 'inherit'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e8e8e8'}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
-        <Image src="/PlusIcon.png" alt="New Project" width={20} height={20} />
+        <Image src="/NewProjectIcon.png" alt="New Project" width={20} height={20} />
         New Project
       </button>
 
       {/* Search Projects Button */}
       <button
         style={{
-          margin: '0 16px 16px 16px',
-          padding: '8px 8px',
+          margin: '0 24px 32px 24px',
+          padding: '0',
           backgroundColor: 'transparent',
           border: 'none',
-          borderRadius: '8px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '10px',
           fontSize: '14px',
           fontWeight: '500',
-          color: '#000000',
+          color: '#111827',
           textAlign: 'left',
-          transition: 'background-color 0.2s',
           fontFamily: 'inherit'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e8e8e8'}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
-        <Image src="/SearchIcon.png" alt="Search" width={20} height={20} />
+        <Image src="/SearchIcon.png" alt="Search" width={16} height={16} style={{ opacity: 0.7 }} />
         Search Projects
       </button>
 
       {/* Market Intelligence Section */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: '32px' }}>
         <div style={{
-          padding: '0 16px',
-          marginBottom: '4px',
-          fontSize: '10px',
+          padding: '0 24px',
+          marginBottom: '12px',
+          fontSize: '11px',
           fontWeight: '500',
-          color: '#999999',
-          letterSpacing: '0.5px'
+          color: '#9CA3AF',
+          letterSpacing: '0.05em'
         }}>
           Market Intelligence
         </div>
         <button
           style={{
-            margin: '0 16px',
-            padding: '8px 8px',
+            margin: '0 24px',
+            padding: '0',
             backgroundColor: 'transparent',
             border: 'none',
-            borderRadius: '8px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
             fontSize: '14px',
             fontWeight: '500',
-            color: '#000000',
+            color: '#111827',
             textAlign: 'left',
-            width: 'calc(100% - 32px)',
-            transition: 'background-color 0.2s',
-            fontFamily: 'inherit'
+            fontFamily: 'inherit',
+            width: 'calc(100% - 48px)'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e8e8e8'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
-          <Image src="/TrendIcon.png" alt="Market Trends" width={20} height={20} />
+          <Image src="/TrendIcon.png" alt="Market Trends" width={16} height={16} style={{ opacity: 0.7 }} />
           Market Trends
         </button>
       </div>
@@ -141,22 +141,23 @@ export default function LeftSidebar({
         flexDirection: 'column'
       }}>
         <div style={{
-          padding: '0 16px',
-          marginBottom: '4px',
-          fontSize: '10px',
+          padding: '0 24px',
+          marginBottom: '12px',
+          fontSize: '11px',
           fontWeight: '500',
-          color: '#999999',
-          letterSpacing: '0.5px'
+          color: '#9CA3AF',
+          letterSpacing: '0.05em'
         }}>
           Projects
         </div>
-        <ProjectList
-          currentProjectId={currentProjectId}
-          onSelectProject={onSelectProject}
-          onCreateProject={onCreateProject}
-        />
+        <div style={{ padding: '0 8px' }}>
+            <ProjectList
+            currentProjectId={currentProjectId}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+            />
+        </div>
       </div>
     </aside>
   );
 }
-

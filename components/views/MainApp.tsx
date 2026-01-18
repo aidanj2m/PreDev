@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import AddressInputContainer from '@/components/modals/AddressInputContainer';
 import AddressList from '@/components/modals/AddressList';
 import MapView from './MapView';
+import AssemblyDataView from './AssemblyDataView';
+import ChatView from './ChatView';
+import ViewToggleBanner, { ViewType } from './ViewToggleBanner';
+import RightSidebar from './RightSidebar';
 import { Address, projectsAPI, addressesAPI } from '@/lib/api-client';
 
 type ViewState = 'input' | 'building' | 'viewing';
@@ -15,9 +19,11 @@ interface MainAppProps {
 
 export default function MainApp({ currentProjectId, onProjectChange }: MainAppProps) {
   const [viewState, setViewState] = useState<ViewState>('input');
+  const [dataViewType, setDataViewType] = useState<ViewType>('map');
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [showInput, setShowInput] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false); // Default closed as requested
   
   // Rate limiting for submissions
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
@@ -25,9 +31,15 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
   // Load project data when project changes
   useEffect(() => {
     if (currentProjectId) {
+      // IMPORTANT: Set UI state FIRST before loading data
+      setIsChatOpen(false); // Always close sidebar when switching projects
+      setDataViewType('map'); // Reset to map view when switching projects
+      // Then load the project data
       loadProjectData(currentProjectId);
     } else {
       // Reset to initial state if no project
+      setIsChatOpen(false);
+      setDataViewType('map');
       setAddresses([]);
       setViewState('input');
       setShowInput(true);
@@ -116,8 +128,11 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     }
 
     setIsSubmittingAddress(true);
+    setIsLoading(true); // Show loading overlay
     try {
+      console.log('Fetching address boundary and parcel data...');
       const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
+      console.log('Address added successfully with boundary data:', newAddress);
       setAddresses([...addresses, newAddress]);
       
       // Go straight to map view (Enter key behavior)
@@ -130,12 +145,28 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       alert('Failed to add address. Please try again.');
     } finally {
       setIsSubmittingAddress(false);
+      setIsLoading(false);
     }
   };
 
   const handleRemoveAddress = async (addressId: string) => {
+    // Handle optimistic updates (temporary IDs)
+    if (addressId.startsWith('temp-')) {
+      console.log('Removing optimistic address from UI:', addressId);
+      const updatedAddresses = addresses.filter(addr => addr.id !== addressId);
+      setAddresses(updatedAddresses);
+      
+      // If no addresses left, go back to input state
+      if (updatedAddresses.length === 0) {
+        setViewState('input');
+        setShowInput(true);
+      }
+      return;
+    }
+
+    // For real addresses, unassign from project (set project_id to NULL)
     try {
-      await addressesAPI.delete(addressId);
+      await addressesAPI.unassignFromProject(addressId);
       const updatedAddresses = addresses.filter(addr => addr.id !== addressId);
       setAddresses(updatedAddresses);
       
@@ -177,6 +208,17 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
   }) => {
     if (!currentProjectId) {
       console.error('No current project');
+      return;
+    }
+
+    // ⚠️ CRITICAL: Check if address already exists in current project
+    const alreadyExists = addresses.some(addr => 
+      addr.full_address.toLowerCase().trim() === validatedAddress.full_address.toLowerCase().trim()
+    );
+    
+    if (alreadyExists) {
+      console.log('Address already exists in project, skipping:', validatedAddress.full_address);
+      alert('This address is already in your project!');
       return;
     }
 
@@ -226,6 +268,24 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       });
   };
 
+  const handleViewChange = (view: ViewType) => {
+    setDataViewType(view);
+    // Close sidebar when switching to chat view
+    if (view === 'chat') {
+      setIsChatOpen(false);
+    }
+  };
+
+  const handleToggleSidebar = () => {
+    const newState = !isChatOpen;
+    setIsChatOpen(newState);
+    
+    // If closing the sidebar and chat was selected, switch to map view
+    if (!newState && dataViewType === 'chat') {
+      setDataViewType('map');
+    }
+  };
+
   // If no project selected, show placeholder
   if (!currentProjectId) {
     return (
@@ -238,7 +298,7 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         padding: '40px',
         position: 'relative',
         overflow: 'hidden',
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#ffffff'
       }}>
         {/* Background Pattern */}
         <div style={{
@@ -284,19 +344,65 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#ffffff'
       }}>
         <div style={{
-          fontSize: '16px',
-          color: '#666666'
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px',
+          padding: '40px',
+          backgroundColor: '#ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
         }}>
-          Loading project...
+          {/* Animated Loading Spinner */}
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #E5E7EB',
+            borderTop: '4px solid #000000',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite'
+          }} />
+          
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#000000'
+            }}>
+              {isSubmittingAddress ? 'Finding Property Boundaries...' : 'Loading Project...'}
+            </div>
+            <div style={{
+              fontSize: '14px',
+              color: '#666666',
+              textAlign: 'center',
+              maxWidth: '300px'
+            }}>
+              {isSubmittingAddress 
+                ? 'Fetching parcel data and surrounding properties. This may take a moment.'
+                : 'Please wait while we load your project data.'}
+            </div>
+          </div>
         </div>
+
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </main>
     );
   }
 
-  // Viewing state - show map
+  // Viewing state - show map or data view
   if (viewState === 'viewing') {
     return (
       <main style={{
@@ -304,13 +410,75 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#ffffff'
       }}>
-        <MapView 
-          addresses={addresses} 
-          onBack={handleBackFromMap} 
-          onAddAddress={handleAddAddressFromMap}
+        {/* View Toggle Banner */}
+        <ViewToggleBanner
+          currentView={dataViewType}
+          onViewChange={handleViewChange}
+          addressCount={addresses.length}
+          isSidebarOpen={isChatOpen}
+          onToggleSidebar={handleToggleSidebar}
         />
+
+        <div style={{
+            flex: 1,
+            display: 'flex',
+            overflow: 'hidden',
+            position: 'relative',
+            isolation: 'isolate'
+        }}>
+            {/* Main Content Area */}
+            <div style={{
+                flex: 1,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                {/* Map View */}
+                {dataViewType === 'map' && (
+                <MapView 
+                    addresses={addresses} 
+                    onBack={handleBackFromMap} 
+                    onAddAddress={handleAddAddressFromMap}
+                    onRemoveAddress={handleRemoveAddress}
+                />
+                )}
+
+                {/* Data View */}
+                {dataViewType === 'data' && (
+                <AssemblyDataView addresses={addresses} />
+                )}
+
+                {/* Chat View - Full screen LLM chat interface */}
+                {dataViewType === 'chat' && (
+                <ChatView addresses={addresses} />
+                )}
+            </div>
+
+            {/* Right Sidebar (Chat) - Slides in/out (hidden when in chat view) */}
+            {dataViewType !== 'chat' && (
+              <div 
+                  style={{
+                      position: 'fixed',
+                      right: 0,
+                      top: '56px',
+                      bottom: 0,
+                      width: '360px',
+                      transform: isChatOpen ? 'translateX(0)' : 'translateX(100%)',
+                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      zIndex: 20,
+                      pointerEvents: isChatOpen ? 'auto' : 'none'
+                  }}
+              >
+                  <RightSidebar
+                      addresses={addresses}
+                      isOpen={isChatOpen}
+                      onClose={() => setIsChatOpen(false)}
+                  />
+              </div>
+            )}
+        </div>
       </main>
     );
   }
@@ -326,7 +494,7 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
       padding: '40px',
       position: 'relative',
       overflow: 'auto',
-      backgroundColor: '#f5f5f5',
+      backgroundColor: '#ffffff',
       transition: 'all 0.3s ease-out'
     }}>
       {/* Background Pattern */}
@@ -373,4 +541,3 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     </main>
   );
 }
-

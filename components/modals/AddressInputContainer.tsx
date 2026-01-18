@@ -70,6 +70,32 @@ export default function AddressInputContainer({
   const [error, setError] = useState<string | null>(null);
   const searchTimeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
+  const dropdownRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+
+  // Handle clicks outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      let clickedInside = false;
+
+      // Check if click was inside any input or dropdown
+      inputRefs.current.forEach((input) => {
+        if (input?.contains(target)) clickedInside = true;
+      });
+      dropdownRefs.current.forEach((dropdown) => {
+        if (dropdown?.contains(target)) clickedInside = true;
+      });
+
+      if (!clickedInside) {
+        setAddressInputs(inputs =>
+          inputs.map(input => ({ ...input, showSuggestions: false }))
+        );
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleAddressChange = (id: string, value: string) => {
     setAddressInputs(inputs =>
@@ -97,7 +123,9 @@ export default function AddressInputContainer({
 
     const newTimeout = setTimeout(async () => {
       try {
+        console.log('Fetching suggestions for:', value);
         const validation = await addressesAPI.validate(value);
+        console.log('Validation response:', validation);
 
         if (validation.valid && validation.formatted_address) {
           const results = [{
@@ -122,6 +150,7 @@ export default function AddressInputContainer({
             });
           });
 
+          console.log('Setting suggestions:', results);
           setAddressInputs(inputs =>
             inputs.map(input =>
               input.id === id
@@ -130,9 +159,12 @@ export default function AddressInputContainer({
             )
           );
           setError(null);
+        } else {
+          console.log('Validation failed or no address found');
         }
       } catch (err) {
         console.error('Autocomplete error:', err);
+        setError(`Failed to fetch suggestions: ${err instanceof Error ? err.message : String(err)}`);
       }
     }, 500);
 
@@ -374,7 +406,7 @@ export default function AddressInputContainer({
         )}
 
         {addressInputs.map((input, index) => (
-          <div key={input.id} style={{ position: 'relative' }}>
+          <div key={input.id} style={{ position: 'relative', zIndex: input.showSuggestions ? 30 : 1 }}>
             {/* Input Container */}
             <div style={{
               position: 'relative',
@@ -398,6 +430,18 @@ export default function AddressInputContainer({
                 value={input.address}
                 onChange={(e) => handleAddressChange(input.id, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(input.id, e)}
+                onFocus={() => {
+                  // Re-show suggestions if they exist and input has enough characters
+                  if (input.suggestions.length > 0 && input.address.length >= 3) {
+                    setAddressInputs(inputs =>
+                      inputs.map(inp =>
+                        inp.id === input.id
+                          ? { ...inp, showSuggestions: true }
+                          : inp
+                      )
+                    );
+                  }
+                }}
                 style={{
                   flex: 1,
                   border: 'none',
@@ -451,7 +495,7 @@ export default function AddressInputContainer({
                   width={16} 
                   height={16}
                   style={{ 
-                    display: 'block', 
+                    display: 'block',
                     filter: assembleMode 
                       ? 'invert(45%) sepia(89%) saturate(2372%) hue-rotate(204deg) brightness(101%) contrast(101%)' 
                       : 'invert(47%) sepia(8%) saturate(593%) hue-rotate(182deg) brightness(95%) contrast(87%)'
@@ -496,7 +540,9 @@ export default function AddressInputContainer({
 
             {/* Suggestions Dropdown */}
             {input.showSuggestions && input.suggestions.length > 0 && (
-              <div style={{
+              <div 
+                ref={(el) => dropdownRefs.current.set(input.id, el)}
+                style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -509,7 +555,7 @@ export default function AddressInputContainer({
                 overflow: 'hidden',
                 maxHeight: '300px',
                 overflowY: 'auto',
-                zIndex: 20
+                zIndex: 100
               }}>
                 {input.suggestions.map((suggestion, idx) => (
                   <div

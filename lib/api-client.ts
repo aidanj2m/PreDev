@@ -3,7 +3,11 @@
  */
 
 // API base URL - defaults to production backend as per user preference
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://your-api-url.vercel.app/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://predev-api.vercel.app/api'
+
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  console.warn('NEXT_PUBLIC_API_URL not set, using default:', API_BASE_URL);
+}
 
 // Types
 export interface Project {
@@ -25,6 +29,7 @@ export interface Address {
   latitude?: number;
   longitude?: number;
   boundary_geojson?: any;
+  surrounding_parcels_geojson?: any; // Cached surrounding parcels data
   created_at: string;
 }
 
@@ -44,10 +49,27 @@ export interface AddressValidation {
   suggestions: string[];
 }
 
+export interface ChatSession {
+  id: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  image_url?: string | null;
+  created_at: string;
+}
+
 // Helper function for fetch requests
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -58,7 +80,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    
+
     // Handle 422 validation errors (FastAPI format)
     if (response.status === 422 && error.detail) {
       if (Array.isArray(error.detail)) {
@@ -71,7 +93,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       }
       throw new Error(error.detail);
     }
-    
+
     throw new Error(error.detail || `API request failed: ${response.status}`);
   }
 
@@ -136,8 +158,14 @@ export const addressesAPI = {
     });
   },
 
-  async getBoundary(addressId: string): Promise<{ address_id: string; boundary: any }> {
+  async getBoundary(addressId: string): Promise<{ address_id: string; boundary: any; surrounding_parcels?: any[] }> {
     return fetchAPI(`/addresses/${addressId}/boundary`);
+  },
+
+  async unassignFromProject(addressId: string): Promise<{ status: string; message: string }> {
+    return fetchAPI(`/addresses/${addressId}/unassign`, {
+      method: 'PATCH',
+    });
   },
 
   async delete(addressId: string): Promise<{ status: string; message: string }> {
@@ -145,6 +173,38 @@ export const addressesAPI = {
       method: 'DELETE',
     });
   },
+
+  async getPropertyData(addressId: string): Promise<{
+    address: Address;
+    parcels: any;
+    buildings: any;
+    assessments: any;
+    ownership: any;
+    tax: any;
+    zoning: any;
+    environmental: any;
+    demographics: any;
+  }> {
+    return fetchAPI(`/addresses/${addressId}/property-data`);
+  },
+};
+
+// Chat API methods
+export const chatAPI = {
+  async createSession(projectId: string, title?: string): Promise<ChatSession> {
+    return fetchAPI('/chat/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, title }),
+    });
+  },
+
+  async getProjectSessions(projectId: string): Promise<ChatSession[]> {
+    return fetchAPI(`/projects/${projectId}/chat/sessions`);
+  },
+
+  async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    return fetchAPI(`/chat/sessions/${sessionId}/messages`);
+  }
 };
 
 // Health check
@@ -154,3 +214,200 @@ export const healthAPI = {
   },
 };
 
+// Zoning Analysis API methods
+export interface ZoningQueryResponse {
+  answer: string;
+  tool_calls: string[];
+}
+
+export const zoningAPI = {
+  async query(query: string, context: { projectId?: string; addressIds?: string[]; sessionId?: string } = {}): Promise<ZoningQueryResponse> {
+    return fetchAPI('/zoning/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        project_id: context.projectId,
+        address_ids: context.addressIds,
+        session_id: context.sessionId
+      }),
+    });
+  },
+};
+
+// Concept Plan Generation API methods
+export interface ConceptPlanResponse {
+  concept_plan_analysis: string;
+  parcel_summary: {
+    num_parcels: number;
+    total_area_sqft: number;
+    addresses: string[];
+  };
+  zoning_summary: {
+    districts: string[];
+    max_height: number | null;
+    max_coverage: number | null;
+  };
+  compliance_issues: string[];
+  image_url: string | null;
+  image_base64: string | null;
+}
+
+export const conceptPlanAPI = {
+  async generate(
+    addressIds: string[],
+    options: {
+      projectId?: string;
+      sessionId?: string;
+      developmentType?: string;
+      customRequirements?: string;
+      includeImage?: boolean;
+    } = {}
+  ): Promise<ConceptPlanResponse> {
+    return fetchAPI('/conceptPlan/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        address_ids: addressIds,
+        project_id: options.projectId,
+        session_id: options.sessionId,
+        development_type: options.developmentType || 'residential',
+        custom_requirements: options.customRequirements,
+        include_image: options.includeImage || false
+      }),
+    });
+  },
+
+  async checkCompliance(addressIds: string[]): Promise<{
+    results: any[];
+    all_compliant: boolean;
+  }> {
+    return fetchAPI('/conceptPlan/check-compliance', {
+      method: 'POST',
+      body: JSON.stringify({ address_ids: addressIds }),
+    });
+  },
+};
+
+// Feasibility Report API methods
+export interface FeasibilityReportResponse {
+  report_id: string;
+  created_at: string;
+  summary_memo: string;
+  notes_document: string;
+  constraints_diagram_url: string | null;
+  concept_plan_url: string | null;
+  site_context: any;
+  zoning_check: any;
+  calculations: any;
+  compliance_issues: string[];
+}
+
+export const feasibilityAPI = {
+  async generate(
+    addressIds: string[],
+    options: {
+      projectId?: string;
+      sessionId?: string;
+      developmentType?: string;
+      unitCountTarget?: number;
+      customRequirements?: string;
+    } = {}
+  ): Promise<FeasibilityReportResponse> {
+    return fetchAPI('/feasibility/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        address_ids: addressIds,
+        project_id: options.projectId,
+        session_id: options.sessionId,
+        development_type: options.developmentType || 'multifamily',
+        unit_count_target: options.unitCountTarget,
+        custom_requirements: options.customRequirements
+      }),
+    });
+  },
+};
+
+// Environmental Layers API - for map visualization of flood zones, wetlands, etc.
+export interface EnvironmentalLayersResponse {
+  address_id: string;
+  full_address: string;
+  layers: {
+    wetlands: GeoJSONFeatureCollection;
+    flood_zones: GeoJSONFeatureCollection;
+  };
+  regrid_flood_zone?: {
+    fema_flood_zone: string | null;
+    fema_flood_zone_subtype: string | null;
+    fema_nri_risk_rating: string | null;
+  };
+}
+
+export interface GeoJSONFeatureCollection {
+  type: 'FeatureCollection';
+  features: GeoJSONFeature[];
+}
+
+export interface GeoJSONFeature {
+  type: 'Feature';
+  geometry: {
+    type: string;
+    coordinates: any;
+  };
+  properties: Record<string, any>;
+}
+
+export interface ProjectEnvironmentalLayersResponse {
+  project_id: string;
+  addresses: EnvironmentalLayersResponse[];
+  combined_layers: {
+    wetlands: GeoJSONFeatureCollection;
+    flood_zones: GeoJSONFeatureCollection;
+  };
+}
+
+export const environmentalAPI = {
+  /**
+   * Get environmental layers (flood zones, wetlands) for a single address.
+   * Returns GeoJSON vector polygons for map overlay.
+   */
+  async getLayersForAddress(
+    addressId: string,
+    options: {
+      includeWetlands?: boolean;
+      includeFloodZones?: boolean;
+    } = {}
+  ): Promise<EnvironmentalLayersResponse> {
+    const params = new URLSearchParams();
+    if (options.includeWetlands !== undefined) {
+      params.append('include_wetlands', String(options.includeWetlands));
+    }
+    if (options.includeFloodZones !== undefined) {
+      params.append('include_flood_zones', String(options.includeFloodZones));
+    }
+    const queryString = params.toString();
+    const endpoint = `/environmental/layers/${addressId}${queryString ? `?${queryString}` : ''}`;
+    return fetchAPI(endpoint);
+  },
+
+  /**
+   * Get environmental layers for all addresses in a project.
+   * Returns combined GeoJSON FeatureCollections for map overlay.
+   */
+  async getLayersForProject(
+    projectId: string,
+    options: {
+      includeWetlands?: boolean;
+      includeFloodZones?: boolean;
+    } = {}
+  ): Promise<ProjectEnvironmentalLayersResponse> {
+    const params = new URLSearchParams();
+    if (options.includeWetlands !== undefined) {
+      params.append('include_wetlands', String(options.includeWetlands));
+    }
+    if (options.includeFloodZones !== undefined) {
+      params.append('include_flood_zones', String(options.includeFloodZones));
+    }
+    const queryString = params.toString();
+    const endpoint = `/environmental/layers/project/${projectId}${queryString ? `?${queryString}` : ''}`;
+    return fetchAPI(endpoint);
+  },
+};
