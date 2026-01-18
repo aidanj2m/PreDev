@@ -6,6 +6,7 @@ import type { FillLayer, LineLayer } from 'react-map-gl';
 import { Address, addressesAPI, environmentalAPI, GeoJSONFeatureCollection } from '@/lib/api-client';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import ParcelPreviewModal from '@/components/modals/ParcelPreviewModal';
+import { parseBoundaryGeoJSON } from '@/lib/wkt-parser';
 
 interface MapViewProps {
   addresses: Address[];
@@ -168,16 +169,17 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             console.log(`Using fully cached data for address ${address.id}`);
 
             // Add main parcel boundary from cached data
-            if (address.boundary_geojson.geometry) {
+            const parsedBoundary = parseBoundaryGeoJSON(address.boundary_geojson);
+            if (parsedBoundary && parsedBoundary.geometry) {
               mainFeatures.push({
                 type: 'Feature',
                 id: mainFeatures.length, // Assign unique numeric ID for hover
                 geometry: {
                   type: 'Polygon',
-                  coordinates: address.boundary_geojson.geometry.coordinates
+                  coordinates: parsedBoundary.geometry.coordinates
                 },
                 properties: {
-                  ...(address.boundary_geojson.properties || {}),
+                  ...(parsedBoundary.properties || {}),
                   _isMainParcel: true,
                   _addressId: address.id // Store address ID for removal
                 }
@@ -221,16 +223,17 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             console.log(`Using cached boundary for address ${address.id}, fetching surrounding parcels`);
 
             // Add main parcel boundary from cached data
-            if (address.boundary_geojson.geometry) {
+            const parsedBoundary = parseBoundaryGeoJSON(address.boundary_geojson);
+            if (parsedBoundary && parsedBoundary.geometry) {
               mainFeatures.push({
                 type: 'Feature',
                 id: mainFeatures.length, // Assign unique numeric ID for hover
                 geometry: {
                   type: 'Polygon',
-                  coordinates: address.boundary_geojson.geometry.coordinates
+                  coordinates: parsedBoundary.geometry.coordinates
                 },
                 properties: {
-                  ...(address.boundary_geojson.properties || {}),
+                  ...(parsedBoundary.properties || {}),
                   _isMainParcel: true,
                   _addressId: address.id // Store address ID for removal
                 }
@@ -243,20 +246,23 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
           const boundaryData = await addressesAPI.getBoundary(address.id);
 
           // Add main parcel boundary (if not already added from cache)
-          if (!address.boundary_geojson && boundaryData.boundary && boundaryData.boundary.geometry) {
-            mainFeatures.push({
-              type: 'Feature',
-              id: mainFeatures.length, // Assign unique numeric ID for hover
-              geometry: {
-                type: 'Polygon',
-                coordinates: boundaryData.boundary.geometry.coordinates
-              },
-              properties: {
-                ...(boundaryData.boundary.properties || {}),
-                _isMainParcel: true,
-                _addressId: address.id // Store address ID for removal
-              }
-            });
+          if (!address.boundary_geojson && boundaryData.boundary) {
+            const parsedBoundary = parseBoundaryGeoJSON(boundaryData.boundary);
+            if (parsedBoundary && parsedBoundary.geometry) {
+              mainFeatures.push({
+                type: 'Feature',
+                id: mainFeatures.length, // Assign unique numeric ID for hover
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: parsedBoundary.geometry.coordinates
+                },
+                properties: {
+                  ...(parsedBoundary.properties || {}),
+                  _isMainParcel: true,
+                  _addressId: address.id // Store address ID for removal
+                }
+              });
+            }
           }
 
           // Add surrounding parcels from API response

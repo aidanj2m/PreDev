@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Address, addressesAPI } from '@/lib/api-client';
+import { parseBoundaryGeoJSON } from '@/lib/wkt-parser';
 
 interface AssemblyDataViewProps {
   addresses: Address[];
@@ -104,9 +105,12 @@ const getAcresFromPropertyData = (data: PropertyData): number => {
   }
   
   // Fallback: try boundary_geojson properties
-  if (data.address?.boundary_geojson?.properties?.ll_gisacre) {
-    const acres = parseFloat(data.address.boundary_geojson.properties.ll_gisacre);
-    if (!isNaN(acres)) return acres;
+  if (data.address?.boundary_geojson) {
+    const parsed = parseBoundaryGeoJSON(data.address.boundary_geojson);
+    if (parsed?.properties?.ll_gisacre) {
+      const acres = parseFloat(parsed.properties.ll_gisacre);
+      if (!isNaN(acres)) return acres;
+    }
   }
   
   return 0;
@@ -437,8 +441,9 @@ export default function AssemblyDataView({ addresses }: AssemblyDataViewProps) {
             }}>
               {propertyData.map((data, index) => {
                 const acres = getAcresFromPropertyData(data);
-                const owner = data.ownership?.owner || data.address.boundary_geojson?.properties?.owner;
-                const landUse = data.zoning?.usedesc || data.address.boundary_geojson?.properties?.land_use;
+                const parsedBoundary = parseBoundaryGeoJSON(data.address.boundary_geojson);
+                const owner = data.ownership?.owner || parsedBoundary?.properties?.owner;
+                const landUse = data.zoning?.usedesc || parsedBoundary?.properties?.land_use;
                 
                 return (
                   <div
