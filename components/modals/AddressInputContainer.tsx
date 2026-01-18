@@ -173,21 +173,31 @@ export default function AddressInputContainer({
 
   const handleSuggestionClick = async (inputId: string, suggestion: AddressInput['suggestions'][0]) => {
     if (suggestion.street && suggestion.city && suggestion.state && suggestion.zip_code) {
+      const validatedData: {
+        street: string;
+        city: string;
+        state: string;
+        zip_code: string;
+        full_address: string;
+        latitude?: number;
+        longitude?: number;
+      } = {
+        street: suggestion.street,
+        city: suggestion.city,
+        state: suggestion.state,
+        zip_code: suggestion.zip_code,
+        full_address: suggestion.full_address,
+        latitude: suggestion.latitude,
+        longitude: suggestion.longitude,
+      };
+      
       setAddressInputs(inputs =>
         inputs.map(input =>
           input.id === inputId
             ? {
                 ...input,
-                address: suggestion.full_address,
-                validatedAddress: {
-                  street: suggestion.street,
-                  city: suggestion.city,
-                  state: suggestion.state,
-                  zip_code: suggestion.zip_code,
-                  full_address: suggestion.full_address,
-                  latitude: suggestion.latitude,
-                  longitude: suggestion.longitude,
-                },
+                address: validatedData.full_address,
+                validatedAddress: validatedData,
                 showSuggestions: false
               }
             : input
@@ -205,21 +215,31 @@ export default function AddressInputContainer({
       try {
         const validation = await addressesAPI.validate(suggestion.full_address);
         if (validation.valid && validation.street && validation.city && validation.state && validation.zip_code && validation.formatted_address) {
+          const validatedData: {
+            street: string;
+            city: string;
+            state: string;
+            zip_code: string;
+            full_address: string;
+            latitude?: number;
+            longitude?: number;
+          } = {
+            street: validation.street,
+            city: validation.city,
+            state: validation.state,
+            zip_code: validation.zip_code,
+            full_address: validation.formatted_address,
+            latitude: validation.latitude,
+            longitude: validation.longitude,
+          };
+          
           setAddressInputs(inputs =>
             inputs.map(input =>
               input.id === inputId
                 ? {
                     ...input,
-                    address: validation.formatted_address,
-                    validatedAddress: {
-                      street: validation.street,
-                      city: validation.city,
-                      state: validation.state,
-                      zip_code: validation.zip_code,
-                      full_address: validation.formatted_address,
-                      latitude: validation.latitude,
-                      longitude: validation.longitude,
-                    },
+                    address: validatedData.full_address,
+                    validatedAddress: validatedData,
                     showSuggestions: false
                   }
                 : input
@@ -312,7 +332,15 @@ export default function AddressInputContainer({
         const firstSuggestion = input.suggestions[0];
 
         if (firstSuggestion.street && firstSuggestion.city && firstSuggestion.state && firstSuggestion.zip_code) {
-          const validated = {
+          const validated: {
+            street: string;
+            city: string;
+            state: string;
+            zip_code: string;
+            full_address: string;
+            latitude?: number;
+            longitude?: number;
+          } = {
             street: firstSuggestion.street,
             city: firstSuggestion.city,
             state: firstSuggestion.state,
@@ -326,7 +354,15 @@ export default function AddressInputContainer({
           try {
             const validation = await addressesAPI.validate(firstSuggestion.full_address);
             if (validation.valid && validation.street && validation.city && validation.state && validation.zip_code && validation.formatted_address) {
-              const validated = {
+              const validated: {
+                street: string;
+                city: string;
+                state: string;
+                zip_code: string;
+                full_address: string;
+                latitude?: number;
+                longitude?: number;
+              } = {
                 street: validation.street,
                 city: validation.city,
                 state: validation.state,
