@@ -226,6 +226,8 @@ export default function ChatView({ addresses }: ChatViewProps) {
       let responseContent = '';
       let conceptPlanImage: string | null = null;
       let conceptPlanImageUrl: string | null = null;
+      let constraintsUrl: string | null = null;
+      let conceptUrl: string | null = null;
       
       if (currentMode === 'feasibilityReport') {
         // Use feasibility report API
@@ -242,9 +244,6 @@ export default function ChatView({ addresses }: ChatViewProps) {
         responseContent = `# Feasibility Report Generated\n\n${response.summary_memo}\n\n---\n\n## Site Data\n\n${response.notes_document}`;
         
         // Capture BOTH images for feasibility report
-        let constraintsUrl: string | null = null;
-        let conceptUrl: string | null = null;
-        
         if (response.constraints_diagram_url) {
           constraintsUrl = response.constraints_diagram_url;
           console.log('✓ Constraints diagram URL received:', constraintsUrl);
