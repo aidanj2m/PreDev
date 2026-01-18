@@ -460,7 +460,7 @@ export default function AddressInputContainer({
             }}>
               {/* Input Field */}
               <input
-                ref={(el) => inputRefs.current.set(input.id, el)}
+                ref={(el) => { inputRefs.current.set(input.id, el); }}
                 type="text"
                 placeholder="Input Address"
                 value={input.address}
@@ -577,7 +577,7 @@ export default function AddressInputContainer({
             {/* Suggestions Dropdown */}
             {input.showSuggestions && input.suggestions.length > 0 && (
               <div 
-                ref={(el) => dropdownRefs.current.set(input.id, el)}
+                ref={(el) => { dropdownRefs.current.set(input.id, el); }}
                 style={{
                 position: 'absolute',
                 top: '100%',
