@@ -233,63 +233,9 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
         if (!address.latitude || !address.longitude) continue;
 
         try {
-          // Check if boundary AND surrounding parcels are already cached
-          if (address.boundary_geojson && address.surrounding_parcels_geojson) {
-            console.log(`Using fully cached data for address ${address.id}`);
-
-            // Add main parcel boundary from cached data
-            const parsedBoundary = parseBoundaryGeoJSON(address.boundary_geojson);
-            if (parsedBoundary && parsedBoundary.geometry) {
-              mainFeatures.push({
-                type: 'Feature',
-                id: mainFeatures.length, // Assign unique numeric ID for hover
-                geometry: {
-                  type: 'Polygon',
-                  coordinates: parsedBoundary.geometry.coordinates
-                },
-                properties: {
-                  ...(parsedBoundary.properties || {}),
-                  _isMainParcel: true,
-                  _addressId: address.id // Store address ID for removal
-                }
-              });
-            }
-
-            // Add surrounding parcels from cached data
-            const cachedFeatures = address.surrounding_parcels_geojson.features || [];
-            console.log(`Found ${cachedFeatures.length} cached surrounding parcels`);
-
-            cachedFeatures.forEach((feature: any, index: number) => {
-              // Skip the main parcel (it's already added above)
-              if (feature.properties?.is_main_parcel) {
-                return;
-              }
-
-              if (feature.geometry && feature.geometry.coordinates) {
-                const featureWithId: any = {
-                  type: 'Feature',
-                  id: surroundingFeatures.length, // Assign unique numeric ID
-                  geometry: {
-                    type: 'Polygon',
-                    coordinates: feature.geometry.coordinates
-                  },
-                  properties: {
-                    ...feature.properties,
-                    _isSurrounding: true,
-                    _index: index
-                  }
-                };
-                surroundingFeatures.push(featureWithId);
-              }
-            });
-
-            // Skip API call since we have all the data
-            continue;
-          }
-
-          // Check if only boundary is cached (partial cache)
+          // Check if boundary is cached
           if (address.boundary_geojson) {
-            console.log(`Using cached boundary for address ${address.id}, fetching surrounding parcels`);
+            console.log(`Using cached boundary for address ${address.id}`);
 
             // Add main parcel boundary from cached data
             const parsedBoundary = parseBoundaryGeoJSON(address.boundary_geojson);
@@ -310,8 +256,8 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             }
           }
 
-          // Fetch from API if not fully cached
-          console.log(`Fetching boundary data from API for address ${address.id}`);
+          // Always fetch surrounding parcels from API (queries Supabase or Lightbox as needed)
+          console.log(`Fetching surrounding parcels from API for address ${address.id}`);
           const boundaryData = await addressesAPI.getBoundary(address.id);
 
           // Add main parcel boundary (if not already added from cache)
@@ -725,6 +671,59 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
       'line-dasharray': [2, 1]
     }
   };
+
+  // Determine if we're still loading critical data
+  const isInitialLoading = isLoadingBoundaries || (addresses.length > 0 && mainParcels.features.length === 0);
+  
+  // Show loading screen while fetching initial data
+  if (isInitialLoading) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f9fafb'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          padding: '40px'
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid #e5e7eb',
+            borderTop: '4px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 500,
+            color: '#1f2937',
+            marginBottom: '8px'
+          }}>
+            Loading parcels...
+          </div>
+          <div style={{
+            fontSize: '14px',
+            color: '#6b7280'
+          }}>
+            {isLoadingBoundaries && 'Fetching boundaries and surrounding parcels'}
+            {isLoadingEnvLayers && showWetlands && ' • Loading wetlands data'}
+          </div>
+        </div>
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{
