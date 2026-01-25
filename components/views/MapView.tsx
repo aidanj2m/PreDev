@@ -2,11 +2,19 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Map, { Source, Layer, MapRef, MapLayerMouseEvent } from 'react-map-gl';
-import type { FillLayer, LineLayer } from 'react-map-gl';
 import { Address, addressesAPI, environmentalAPI, GeoJSONFeatureCollection } from '@/lib/api-client';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import ParcelPreviewModal from '@/components/modals/ParcelPreviewModal';
+import EnvironmentalLayersPanel from '@/components/map/EnvironmentalLayersPanel';
 import { parseBoundaryGeoJSON } from '@/lib/wkt-parser';
+import {
+  mainParcelFillLayer,
+  mainParcelLineLayer,
+  surroundingParcelFillLayer,
+  surroundingParcelLineLayer,
+  wetlandsFillLayer,
+  wetlandsLineLayer
+} from '@/lib/map-layer-styles';
 
 interface MapViewProps {
   addresses: Address[];
@@ -52,18 +60,13 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
   const hasAutoZoomedRef = useRef<boolean>(false); // Track if we've already auto-zoomed
   const lastAddressesLengthRef = useRef<number>(0); // Track the last addresses count we zoomed for
 
-  // Environmental layers state
-  const [showFloodZones, setShowFloodZones] = useState(false);
+  // Environmental layers state (wetlands only)
   const [showWetlands, setShowWetlands] = useState(false);
-  const [floodZones, setFloodZones] = useState<GeoJSONFeatureCollection>({ type: 'FeatureCollection', features: [] });
   const [wetlands, setWetlands] = useState<GeoJSONFeatureCollection>({ type: 'FeatureCollection', features: [] });
   const [isLoadingEnvLayers, setIsLoadingEnvLayers] = useState(false);
   const [wetlandTypes, setWetlandTypes] = useState<any[]>([]);
   const [showWetlandsLegend, setShowWetlandsLegend] = useState(false);
   const [autoRefreshWetlands, setAutoRefreshWetlands] = useState(false);
-
-  // Map style state
-  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');
 
   // Calculate center and zoom from addresses
   const validCoords = addresses.filter(a => a.latitude && a.longitude);
@@ -149,52 +152,26 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     loadWetlandTypes();
   }, [showWetlands]);
 
-  // Load environmental layers when toggled on
+  // Load wetlands when toggled on
   useEffect(() => {
-    const loadEnvironmentalLayers = async () => {
-      if (!showFloodZones && !showWetlands) {
+    const loadWetlands = async () => {
+      if (!showWetlands) {
         return;
       }
 
       setIsLoadingEnvLayers(true);
 
       try {
-        // Fetch flood zones for all addresses (if toggled on)
-        if (showFloodZones && addresses.length > 0) {
-          const allFloodFeatures: any[] = [];
-          
-          for (const address of addresses) {
-            try {
-              const result = await environmentalAPI.getLayersForAddress(address.id, {
-                includeFloodZones: true,
-                includeWetlands: false,
-              });
-
-              if (result.layers.flood_zones?.features) {
-                allFloodFeatures.push(...result.layers.flood_zones.features);
-              }
-            } catch (err) {
-              console.error(`Error loading flood zones for address ${address.id}:`, err);
-            }
-          }
-
-          setFloodZones({ type: 'FeatureCollection', features: allFloodFeatures });
-          console.log(`✓ Loaded ${allFloodFeatures.length} flood zone features`);
-        }
-
-        // Fetch wetlands by bounding box when toggled on
-        if (showWetlands) {
-          await fetchWetlandsInViewport();
-        }
+        await fetchWetlandsInViewport();
       } catch (error) {
-        console.error('Error loading environmental layers:', error);
+        console.error('Error loading wetlands:', error);
       } finally {
         setIsLoadingEnvLayers(false);
       }
     };
 
-    loadEnvironmentalLayers();
-  }, [showFloodZones, showWetlands, addresses, fetchWetlandsInViewport]);
+    loadWetlands();
+  }, [showWetlands, fetchWetlandsInViewport]);
 
   // Auto-refresh wetlands when map moves (if enabled)
   useEffect(() => {
@@ -508,170 +485,6 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     setHoveredParcelInfo(null);
   }, [clearHoverState]);
 
-  // Main parcel fill layer with hover effect
-  const mainParcelFillLayer: FillLayer = {
-    id: 'main-parcels-fill',
-    type: 'fill',
-    source: 'main-parcels',
-    paint: {
-      'fill-color': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#DC2626',  // Red on hover (to indicate removal)
-        '#9CA3AF'   // Grey default
-      ],
-      'fill-opacity': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        0.5,
-        0.5
-      ],
-      'fill-outline-color': '#000000'
-    }
-  };
-
-  // Main parcel outline layer
-  const mainParcelLineLayer: LineLayer = {
-    id: 'main-parcels-line',
-    type: 'line',
-    source: 'main-parcels',
-    paint: {
-      'line-color': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#DC2626',  // Red border on hover
-        '#000000'   // Black border default
-      ],
-      'line-width': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        4,
-        2
-      ]
-    }
-  };
-
-  // Surrounding parcel fill layer
-  const surroundingParcelFillLayer: FillLayer = {
-    id: 'surrounding-parcels-fill',
-    type: 'fill',
-    source: 'surrounding-parcels',
-    paint: {
-      'fill-color': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#3B82F6',  // Blue on hover
-        'transparent' // Transparent default
-      ],
-      'fill-opacity': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        0.25,
-        0
-      ],
-      'fill-outline-color': '#E5E7EB'
-    }
-  };
-
-  // Surrounding parcel outline layer
-  const surroundingParcelLineLayer: LineLayer = {
-    id: 'surrounding-parcels-line',
-    type: 'line',
-    source: 'surrounding-parcels',
-    paint: {
-      'line-color': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#3B82F6',  // Blue border on hover
-        '#E5E7EB'   // Grey border default
-      ],
-      'line-width': [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        2,
-        1
-      ]
-    }
-  };
-
-  // Flood zone fill layer (blue with transparency)
-  const floodZoneFillLayer: FillLayer = {
-    id: 'flood-zones-fill',
-    type: 'fill',
-    source: 'flood-zones',
-    paint: {
-      'fill-color': [
-        'case',
-        ['get', 'is_high_risk'],
-        '#DC2626',  // Red for high-risk zones (A, AE, V, VE, etc.)
-        '#3B82F6'   // Blue for moderate/minimal risk zones (X)
-      ],
-      'fill-opacity': 0.35
-    }
-  };
-
-  // Flood zone outline layer
-  const floodZoneLineLayer: LineLayer = {
-    id: 'flood-zones-line',
-    type: 'line',
-    source: 'flood-zones',
-    paint: {
-      'line-color': [
-        'case',
-        ['get', 'is_high_risk'],
-        '#991B1B',  // Dark red for high-risk
-        '#1D4ED8'   // Dark blue for other zones
-      ],
-      'line-width': 2,
-      'line-dasharray': [2, 2]
-    }
-  };
-
-  // Wetlands fill layer (color-coded by type)
-  const wetlandsFillLayer: FillLayer = {
-    id: 'wetlands-fill',
-    type: 'fill',
-    source: 'wetlands',
-    paint: {
-      'fill-color': [
-        'match',
-        ['get', 'wetland_type'],
-        'Freshwater Forested/Shrub Wetland', '#065F46',  // Dark green
-        'Riverine', '#0284C7',  // Blue
-        'Freshwater Pond', '#0891B2',  // Cyan
-        'Freshwater Emergent Wetland', '#059669',  // Emerald
-        'Estuarine and Marine Wetland', '#0EA5E9',  // Sky blue
-        'Estuarine and Marine Deepwater', '#0C4A6E',  // Dark blue
-        'Lake', '#1E3A8A',  // Navy blue
-        '#6B7280'  // Gray (default for "Other")
-      ],
-      'fill-opacity': 0.4
-    }
-  };
-
-  // Wetlands outline layer
-  const wetlandsLineLayer: LineLayer = {
-    id: 'wetlands-line',
-    type: 'line',
-    source: 'wetlands',
-    paint: {
-      'line-color': [
-        'match',
-        ['get', 'wetland_type'],
-        'Freshwater Forested/Shrub Wetland', '#065F46',
-        'Riverine', '#0284C7',
-        'Freshwater Pond', '#0891B2',
-        'Freshwater Emergent Wetland', '#059669',
-        'Estuarine and Marine Wetland', '#0EA5E9',
-        'Estuarine and Marine Deepwater', '#0C4A6E',
-        'Lake', '#1E3A8A',
-        '#6B7280'
-      ],
-      'line-width': 1.5,
-      'line-dasharray': [2, 1]
-    }
-  };
-
   // Determine if we're still loading critical data
   const isInitialLoading = isLoadingBoundaries || (addresses.length > 0 && mainParcels.features.length === 0);
   
@@ -746,21 +559,13 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             latitude: center[1],
             zoom: zoom
           }}
-          mapStyle={currentMapStyle === 'satellite' ? "mapbox://styles/mapbox/satellite-streets-v12" : "mapbox://styles/mapbox/light-v11"}
+          mapStyle="mapbox://styles/mapbox/light-v11"
           cursor={cursor}
           interactiveLayerIds={['main-parcels-fill', 'surrounding-parcels-fill']}
           onClick={handleMapClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Flood zones layer (bottom) */}
-          {showFloodZones && (
-            <Source id="flood-zones" type="geojson" data={floodZones}>
-              <Layer {...floodZoneFillLayer} />
-              <Layer {...floodZoneLineLayer} />
-            </Source>
-          )}
-
           {/* Wetlands layer */}
           {showWetlands && (
             <Source id="wetlands" type="geojson" data={wetlands}>
@@ -782,282 +587,19 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
           </Source>
         </Map>
 
-        {/* Environmental Layers Control Panel */}
-        <div style={{
-          position: 'absolute',
-          top: 16,
-          right: 16,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          borderRadius: 8,
-          padding: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          minWidth: 180,
-          zIndex: 10
-        }}>
-          <div style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#374151',
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}>
-            🗺️ Environmental Layers
-            {isLoadingEnvLayers && (
-              <span style={{ fontSize: 10, color: '#6B7280' }}>(loading...)</span>
-            )}
-          </div>
-
-          {/* Map Style Toggle */}
-          <div style={{
-            display: 'flex',
-            backgroundColor: '#F3F4F6',
-            borderRadius: 6,
-            padding: 2,
-            marginBottom: 12
-          }}>
-            <button
-              onClick={() => setCurrentMapStyle('streets')}
-              style={{
-                flex: 1,
-                padding: '4px 8px',
-                fontSize: 12,
-                borderRadius: 4,
-                border: 'none',
-                backgroundColor: currentMapStyle === 'streets' ? 'white' : 'transparent',
-                color: currentMapStyle === 'streets' ? '#1F2937' : '#6B7280',
-                boxShadow: currentMapStyle === 'streets' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                cursor: 'pointer',
-                fontWeight: currentMapStyle === 'streets' ? 500 : 400
-              }}
-            >
-              Map
-            </button>
-            <button
-              onClick={() => setCurrentMapStyle('satellite')}
-              style={{
-                flex: 1,
-                padding: '4px 8px',
-                fontSize: 12,
-                borderRadius: 4,
-                border: 'none',
-                backgroundColor: currentMapStyle === 'satellite' ? 'white' : 'transparent',
-                color: currentMapStyle === 'satellite' ? '#1F2937' : '#6B7280',
-                boxShadow: currentMapStyle === 'satellite' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                cursor: 'pointer',
-                fontWeight: currentMapStyle === 'satellite' ? 500 : 400
-              }}
-            >
-              Satellite
-            </button>
-          </div>
-
-          {/* Flood Zones Toggle */}
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 0',
-            cursor: 'pointer',
-            fontSize: 13,
-            color: '#1F2937'
-          }}>
-            <input
-              type="checkbox"
-              checked={showFloodZones}
-              onChange={(e) => setShowFloodZones(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer' }}
-            />
-            <span style={{
-              display: 'inline-block',
-              width: 12,
-              height: 12,
-              backgroundColor: '#DC2626',
-              opacity: 0.6,
-              borderRadius: 2,
-              border: '1px solid #991B1B'
-            }} />
-            Flood Zones
-            {showFloodZones && floodZones.features.length > 0 && (
-              <span style={{ fontSize: 10, color: '#6B7280' }}>
-                ({floodZones.features.length})
-              </span>
-            )}
-          </label>
-
-          {/* Wetlands Toggle */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 0',
-              cursor: 'pointer',
-              fontSize: 13,
-              color: '#1F2937'
-            }}>
-              <input
-                type="checkbox"
-                checked={showWetlands}
-                onChange={(e) => setShowWetlands(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: 'pointer' }}
-              />
-              <span style={{
-                display: 'inline-block',
-                width: 12,
-                height: 12,
-                backgroundColor: '#059669',
-                opacity: 0.6,
-                borderRadius: 2,
-                border: '1px solid #047857'
-              }} />
-              Wetlands
-              {showWetlands && wetlands.features.length > 0 && (
-                <span style={{ fontSize: 10, color: '#6B7280' }}>
-                  ({wetlands.features.length})
-                </span>
-              )}
-            </label>
-
-            {/* Wetlands Controls */}
-            {showWetlands && (
-              <div style={{
-                marginLeft: 24,
-                paddingLeft: 8,
-                borderLeft: '2px solid #E5E7EB',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6
-              }}>
-                {/* Legend Toggle */}
-                {wetlandTypes.length > 0 && (
-                  <button
-                    onClick={() => setShowWetlandsLegend(!showWetlandsLegend)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 11,
-                      color: '#6B7280',
-                      textDecoration: 'underline',
-                      textAlign: 'left',
-                      padding: 0
-                    }}
-                  >
-                    {showWetlandsLegend ? '▼ Hide' : '▶ Show'} Legend
-                  </button>
-                )}
-
-                {/* Manual Refresh Button */}
-                <button
-                  onClick={() => fetchWetlandsInViewport()}
-                  disabled={isLoadingEnvLayers}
-                  style={{
-                    fontSize: 11,
-                    padding: '4px 8px',
-                    backgroundColor: '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: isLoadingEnvLayers ? 'not-allowed' : 'pointer',
-                    opacity: isLoadingEnvLayers ? 0.5 : 1
-                  }}
-                >
-                  {isLoadingEnvLayers ? 'Loading...' : '🔄 Refresh Wetlands'}
-                </button>
-
-                {/* Auto-refresh Toggle */}
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 11,
-                  color: '#6B7280',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={autoRefreshWetlands}
-                    onChange={(e) => setAutoRefreshWetlands(e.target.checked)}
-                    style={{ width: 12, height: 12, cursor: 'pointer' }}
-                  />
-                  Auto-refresh on pan/zoom
-                </label>
-              </div>
-            )}
-
-            {/* Wetlands Legend */}
-            {showWetlands && showWetlandsLegend && wetlandTypes.length > 0 && (
-              <div style={{
-                marginLeft: 24,
-                paddingLeft: 8,
-                borderLeft: '2px solid #E5E7EB',
-                fontSize: 11,
-                color: '#6B7280',
-                maxHeight: 200,
-                overflowY: 'auto'
-              }}>
-                {wetlandTypes.map((type, index) => (
-                  <div key={index} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '3px 0'
-                  }}>
-                    <span style={{
-                      display: 'inline-block',
-                      width: 10,
-                      height: 10,
-                      backgroundColor: type.color,
-                      opacity: 0.6,
-                      borderRadius: 2,
-                      border: `1px solid ${type.color}`,
-                      flexShrink: 0
-                    }} />
-                    <span style={{ fontSize: 10, lineHeight: 1.2 }}>
-                      {type.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Legend for high-risk flood zones */}
-          {showFloodZones && floodZones.features.some(f => f.properties?.is_high_risk) && (
-            <div style={{
-              marginTop: 8,
-              paddingTop: 8,
-              borderTop: '1px solid #E5E7EB',
-              fontSize: 11,
-              color: '#6B7280'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: 10,
-                  height: 10,
-                  backgroundColor: '#DC2626',
-                  opacity: 0.5,
-                  borderRadius: 2
-                }} />
-                High Risk (A, AE, V, VE)
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  display: 'inline-block',
-                  width: 10,
-                  height: 10,
-                  backgroundColor: '#3B82F6',
-                  opacity: 0.5,
-                  borderRadius: 2
-                }} />
-                Moderate/Minimal (X, D)
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Wetlands Control Panel */}
+        <EnvironmentalLayersPanel
+          showWetlands={showWetlands}
+          onWetlandsChange={setShowWetlands}
+          wetlandCount={wetlands.features.length}
+          wetlandTypes={wetlandTypes}
+          showWetlandsLegend={showWetlandsLegend}
+          onToggleWetlandsLegend={() => setShowWetlandsLegend(!showWetlandsLegend)}
+          onRefreshWetlands={fetchWetlandsInViewport}
+          autoRefreshWetlands={autoRefreshWetlands}
+          onAutoRefreshChange={setAutoRefreshWetlands}
+          isLoading={isLoadingEnvLayers}
+        />
 
         {/* Parcel Preview Modal (Quick Access Data) */}
         <ParcelPreviewModal parcelInfo={hoveredParcelInfo} />
