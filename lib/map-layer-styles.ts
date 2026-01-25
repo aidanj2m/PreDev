@@ -61,7 +61,7 @@ export const surroundingParcelFillLayer: FillLayer = {
       0.25,
       0
     ],
-    'fill-outline-color': '#E5E7EB'
+    'fill-outline-color': '#6B7280'  // Darker grey (was #E5E7EB)
   }
 };
 
@@ -75,13 +75,13 @@ export const surroundingParcelLineLayer: LineLayer = {
       'case',
       ['boolean', ['feature-state', 'hover'], false],
       '#3B82F6',  // Blue border on hover
-      '#E5E7EB'   // Grey border default
+      '#6B7280'   // Darker grey border default (was #E5E7EB)
     ],
     'line-width': [
       'case',
       ['boolean', ['feature-state', 'hover'], false],
-      2,
-      1
+      2.5,
+      1.5  // Increased from 1 to 1.5
     ]
   }
 };
