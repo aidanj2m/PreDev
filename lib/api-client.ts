@@ -410,4 +410,69 @@ export const environmentalAPI = {
     const endpoint = `/environmental/layers/project/${projectId}${queryString ? `?${queryString}` : ''}`;
     return fetchAPI(endpoint);
   },
+
+  /**
+   * Get NJ wetlands within a bounding box directly from Supabase.
+   * Much faster than the old NWI API approach.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJWetlandsInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      wetlandType?: string;
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+    
+    if (options.wetlandType) {
+      params.append('wetland_type', options.wetlandType);
+    }
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+    
+    return fetchAPI(`/nj-wetlands?${params.toString()}`);
+  },
+
+  /**
+   * Get all wetland types with colors for the legend.
+   */
+  async getWetlandTypes(): Promise<{
+    wetland_types: Array<{
+      name: string;
+      count: number;
+      total_acres: number;
+      color: string;
+      fillOpacity: number;
+      lineColor: string;
+      lineWidth: number;
+    }>;
+    total_types: number;
+  }> {
+    return fetchAPI('/nj-wetlands/types');
+  },
+
+  /**
+   * Get information about the NJ wetlands dataset.
+   */
+  async getWetlandsInfo(): Promise<{
+    service: string;
+    provider: string;
+    data_source: string;
+    total_features: number;
+    total_acres: number;
+    coverage: string;
+    note: string;
+  }> {
+    return fetchAPI('/nj-wetlands/info');
+  },
 };
