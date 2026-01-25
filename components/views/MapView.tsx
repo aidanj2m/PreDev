@@ -60,6 +60,7 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
   const [isLoadingEnvLayers, setIsLoadingEnvLayers] = useState(false);
   const [wetlandTypes, setWetlandTypes] = useState<any[]>([]);
   const [showWetlandsLegend, setShowWetlandsLegend] = useState(false);
+  const [autoRefreshWetlands, setAutoRefreshWetlands] = useState(false);
 
   // Map style state
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');
@@ -102,6 +103,35 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     }
   }, [addresses.length, center[0], center[1]]); // Trigger when addresses change
 
+  // Function to fetch wetlands in current viewport
+  const fetchWetlandsInViewport = useCallback(async () => {
+    if (!showWetlands || !mapRef.current) return;
+
+    try {
+      const map = mapRef.current.getMap();
+      const bounds = map.getBounds();
+      
+      if (!bounds) return;
+      
+      const bbox: [number, number, number, number] = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ];
+
+      console.log('Fetching wetlands in viewport:', bbox);
+      const wetlandsData = await environmentalAPI.getNJWetlandsInBbox(bbox, {
+        limit: 2000
+      });
+
+      setWetlands(wetlandsData);
+      console.log(`✓ Loaded ${wetlandsData.features.length} wetland features in viewport`);
+    } catch (err) {
+      console.error('Error loading wetlands:', err);
+    }
+  }, [showWetlands]);
+
   // Load wetland types for legend
   useEffect(() => {
     const loadWetlandTypes = async () => {
@@ -119,33 +149,16 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     loadWetlandTypes();
   }, [showWetlands]);
 
-  // Load environmental layers based on map bounds
+  // Load environmental layers when toggled on
   useEffect(() => {
     const loadEnvironmentalLayers = async () => {
-      // Only load if at least one toggle is on and we have a map
-      if ((!showFloodZones && !showWetlands) || !mapRef.current) {
+      if (!showFloodZones && !showWetlands) {
         return;
       }
 
       setIsLoadingEnvLayers(true);
 
       try {
-        const map = mapRef.current.getMap();
-        const bounds = map.getBounds();
-        
-        if (!bounds) {
-          setIsLoadingEnvLayers(false);
-          return;
-        }
-        
-        // Get bounding box coordinates
-        const bbox: [number, number, number, number] = [
-          bounds.getWest(),
-          bounds.getSouth(),
-          bounds.getEast(),
-          bounds.getNorth()
-        ];
-
         // Fetch flood zones for all addresses (if toggled on)
         if (showFloodZones && addresses.length > 0) {
           const allFloodFeatures: any[] = [];
@@ -169,18 +182,9 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
           console.log(`✓ Loaded ${allFloodFeatures.length} flood zone features`);
         }
 
-        // Fetch wetlands by bounding box (much faster!)
+        // Fetch wetlands by bounding box when toggled on
         if (showWetlands) {
-          try {
-            const wetlandsData = await environmentalAPI.getNJWetlandsInBbox(bbox, {
-              limit: 2000
-            });
-
-            setWetlands(wetlandsData);
-            console.log(`✓ Loaded ${wetlandsData.features.length} wetland features in viewport`);
-          } catch (err) {
-            console.error('Error loading wetlands:', err);
-          }
+          await fetchWetlandsInViewport();
         }
       } catch (error) {
         console.error('Error loading environmental layers:', error);
@@ -190,7 +194,31 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     };
 
     loadEnvironmentalLayers();
-  }, [showFloodZones, showWetlands, addresses]);
+  }, [showFloodZones, showWetlands, addresses, fetchWetlandsInViewport]);
+
+  // Auto-refresh wetlands when map moves (if enabled)
+  useEffect(() => {
+    if (!autoRefreshWetlands || !showWetlands || !mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    
+    // Debounce the refresh to avoid too many API calls
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleMoveEnd = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetchWetlandsInViewport();
+      }, 500); // Wait 500ms after movement stops
+    };
+
+    map.on('moveend', handleMoveEnd);
+    
+    return () => {
+      map.off('moveend', handleMoveEnd);
+      clearTimeout(timeoutId);
+    };
+  }, [autoRefreshWetlands, showWetlands, fetchWetlandsInViewport]);
 
   // Load boundaries and parcels
   useEffect(() => {
@@ -891,23 +919,74 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
                   ({wetlands.features.length})
                 </span>
               )}
-              {showWetlands && wetlandTypes.length > 0 && (
+            </label>
+
+            {/* Wetlands Controls */}
+            {showWetlands && (
+              <div style={{
+                marginLeft: 24,
+                paddingLeft: 8,
+                borderLeft: '2px solid #E5E7EB',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6
+              }}>
+                {/* Legend Toggle */}
+                {wetlandTypes.length > 0 && (
+                  <button
+                    onClick={() => setShowWetlandsLegend(!showWetlandsLegend)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      color: '#6B7280',
+                      textDecoration: 'underline',
+                      textAlign: 'left',
+                      padding: 0
+                    }}
+                  >
+                    {showWetlandsLegend ? '▼ Hide' : '▶ Show'} Legend
+                  </button>
+                )}
+
+                {/* Manual Refresh Button */}
                 <button
-                  onClick={() => setShowWetlandsLegend(!showWetlandsLegend)}
+                  onClick={() => fetchWetlandsInViewport()}
+                  disabled={isLoadingEnvLayers}
                   style={{
-                    marginLeft: 'auto',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
                     fontSize: 11,
-                    color: '#6B7280',
-                    textDecoration: 'underline'
+                    padding: '4px 8px',
+                    backgroundColor: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: isLoadingEnvLayers ? 'not-allowed' : 'pointer',
+                    opacity: isLoadingEnvLayers ? 0.5 : 1
                   }}
                 >
-                  {showWetlandsLegend ? 'Hide' : 'Show'} Legend
+                  {isLoadingEnvLayers ? 'Loading...' : '🔄 Refresh Wetlands'}
                 </button>
-              )}
-            </label>
+
+                {/* Auto-refresh Toggle */}
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 11,
+                  color: '#6B7280',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={autoRefreshWetlands}
+                    onChange={(e) => setAutoRefreshWetlands(e.target.checked)}
+                    style={{ width: 12, height: 12, cursor: 'pointer' }}
+                  />
+                  Auto-refresh on pan/zoom
+                </label>
+              </div>
+            )}
 
             {/* Wetlands Legend */}
             {showWetlands && showWetlandsLegend && wetlandTypes.length > 0 && (
