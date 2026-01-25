@@ -3,7 +3,7 @@
  */
 
 // API base URL - defaults to production backend as per user preference
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://predev-api.vercel.app/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://entitely-api.vercel.app/api'
 
 if (!process.env.NEXT_PUBLIC_API_URL) {
   console.warn('NEXT_PUBLIC_API_URL not set, using default:', API_BASE_URL);
