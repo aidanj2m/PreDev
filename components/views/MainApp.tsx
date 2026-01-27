@@ -15,9 +15,10 @@ type ViewState = 'input' | 'building' | 'viewing';
 interface MainAppProps {
   currentProjectId: string | null;
   onProjectChange: () => void;
+  onCreateProjectWithAddress: () => Promise<string>;
 }
 
-export default function MainApp({ currentProjectId, onProjectChange }: MainAppProps) {
+export default function MainApp({ currentProjectId, onProjectChange, onCreateProjectWithAddress }: MainAppProps) {
   const [viewState, setViewState] = useState<ViewState>('input');
   const [dataViewType, setDataViewType] = useState<ViewType>('map');
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -77,11 +78,6 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     latitude?: number;
     longitude?: number;
   }) => {
-    if (!currentProjectId) {
-      console.error('No current project');
-      return;
-    }
-
     // Prevent concurrent submissions
     if (isSubmittingAddress) {
       console.log('Submission already in progress, ignoring duplicate request');
@@ -90,7 +86,16 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
 
     setIsSubmittingAddress(true);
     try {
-      const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
+      let projectId = currentProjectId;
+      
+      // If no project exists, create one first
+      if (!projectId) {
+        console.log('No project exists, creating new project...');
+        projectId = await onCreateProjectWithAddress();
+        console.log('New project created:', projectId);
+      }
+      
+      const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
       setAddresses([...addresses, newAddress]);
       
       // Transition to building state and hide input (for assembling more)
@@ -116,11 +121,6 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     latitude?: number;
     longitude?: number;
   }) => {
-    if (!currentProjectId) {
-      console.error('No current project');
-      return;
-    }
-
     // Prevent concurrent submissions
     if (isSubmittingAddress) {
       console.log('Submission already in progress, ignoring duplicate request');
@@ -130,8 +130,17 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     setIsSubmittingAddress(true);
     setIsLoading(true); // Show loading overlay
     try {
+      let projectId = currentProjectId;
+      
+      // If no project exists, create one first
+      if (!projectId) {
+        console.log('No project exists, creating new project...');
+        projectId = await onCreateProjectWithAddress();
+        console.log('New project created:', projectId);
+      }
+      
       console.log('Fetching address boundary and parcel data...');
-      const newAddress = await addressesAPI.addToProject(currentProjectId, validatedAddress);
+      const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
       console.log('Address added successfully with boundary data:', newAddress);
       setAddresses([...addresses, newAddress]);
       
@@ -286,7 +295,7 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
     }
   };
 
-  // If no project selected, show placeholder
+  // If no project selected, show address input to create one
   if (!currentProjectId) {
     return (
       <main style={{
@@ -312,25 +321,23 @@ export default function MainApp({ currentProjectId, onProjectChange }: MainAppPr
           pointerEvents: 'none'
         }} />
 
+        {/* Content Container */}
         <div style={{
-          textAlign: 'center',
-          zIndex: 1
+          width: '100%',
+          maxWidth: '700px',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          marginTop: '-120px'
         }}>
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            color: '#000000',
-            marginBottom: '12px'
-          }}>
-            Welcome to PreDev
-          </h2>
-          <p style={{
-            fontSize: '16px',
-            color: '#666666',
-            marginBottom: '24px'
-          }}>
-            Create a new project to start surveying properties
-          </p>
+          <AddressInputContainer
+            onAddressValidated={handleAddressValidated}
+            onAddressSubmitted={handleAddressSubmitted}
+            visible={true}
+            position="center"
+            showHeader={true}
+          />
         </div>
       </main>
     );

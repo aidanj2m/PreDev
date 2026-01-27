@@ -31,6 +31,26 @@ export default function Home() {
     }
   };
 
+  const handleCreateProjectWithAddress = async () => {
+    try {
+      const timestamp = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      const newProject = await projectsAPI.create(`Property Survey - ${timestamp}`);
+      setCurrentProjectId(newProject.id);
+      setRefreshTrigger(prev => prev + 1);
+      return newProject.id;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      alert('Failed to create project. Please try again.');
+      throw error;
+    }
+  };
+
   const handleProjectChange = () => {
     // Trigger refresh of project list in sidebar
     setRefreshTrigger(prev => prev + 1);
@@ -52,6 +72,7 @@ export default function Home() {
       <MainApp
         currentProjectId={currentProjectId}
         onProjectChange={handleProjectChange}
+        onCreateProjectWithAddress={handleCreateProjectWithAddress}
       />
     </div>
   );

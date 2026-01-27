@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import ProjectList from '@/components/modals/ProjectList';
 
@@ -15,107 +15,214 @@ export default function LeftSidebar({
   onSelectProject,
   onCreateProject
 }: LeftSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+
   return (
-    <aside style={{
-      width: '260px',
-      height: '100vh',
-      backgroundColor: '#ffffff',
-      borderRight: '1px solid #E5E7EB',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '24px 0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      flexShrink: 0
-    }}>
-      {/* Logo/Title */}
+    <aside 
+      onMouseEnter={() => setIsSidebarHovered(true)}
+      onMouseLeave={() => setIsSidebarHovered(false)}
+      onClick={() => {
+        if (isCollapsed) {
+          setIsCollapsed(false);
+        }
+      }}
+      style={{
+        width: isCollapsed ? '60px' : '260px',
+        height: '100vh',
+        backgroundColor: '#ffffff',
+        borderRight: '1px solid #E5E7EB',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '12px 0',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        flexShrink: 0,
+        transition: 'width 0.2s ease-in-out',
+        position: 'relative',
+        overflow: isCollapsed ? 'visible' : 'hidden',
+        cursor: isCollapsed ? 'ew-resize' : 'default',
+        zIndex: 1000
+      }}>
+      {/* Logo/Title / Toggle Icon */}
       <div style={{
-        padding: '0 24px',
-        marginBottom: '32px',
+        margin: '0 8px 32px 8px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        justifyContent: 'space-between'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-             <Image src="/PreDevLogo.png" alt="PreDev Logo" width={24} height={24} />
-        </div>
-        <h1 style={{
-          fontSize: '16px',
-          fontWeight: '700',
-          color: '#111827',
-          margin: 0,
-          letterSpacing: '-0.02em'
-        }}>
-          Entitely
-        </h1>
+        {isCollapsed ? (
+          <button
+            onMouseEnter={() => setHoveredButton('logo')}
+            onMouseLeave={() => setHoveredButton(null)}
+            style={{ 
+              padding: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              overflow: 'hidden',
+              flex: 1,
+              backgroundColor: hoveredButton === 'logo' ? '#E5E7EB' : 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease'
+            }}
+          >
+            <div style={{ 
+              width: '24px',
+              height: '24px',
+              flexShrink: 0
+            }}>
+              <Image 
+                src={isSidebarHovered ? "/rightSidebarIcon.png" : "/PreDevLogo.png"}
+                alt={isSidebarHovered ? "Expand" : "PreDev Logo"}
+                width={24} 
+                height={24} 
+              />
+            </div>
+          </button>
+        ) : (
+          <>
+            <div style={{ 
+              padding: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              overflow: 'hidden',
+              flex: 1
+            }}>
+              <div style={{ 
+                width: '24px',
+                height: '24px',
+                flexShrink: 0
+              }}>
+                <Image 
+                  src="/PreDevLogo.png"
+                  alt="PreDev Logo"
+                  width={24} 
+                  height={24} 
+                />
+              </div>
+              <h1 style={{
+                fontSize: '16px',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0,
+                letterSpacing: '-0.02em',
+                whiteSpace: 'nowrap',
+                opacity: isCollapsed ? 0 : 1,
+                transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease'
+              }}>
+                Entitely
+              </h1>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCollapsed(true);
+              }}
+              style={{
+                padding: '10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Image 
+                src="/rightSidebarIconSelected.png" 
+                alt="Collapse" 
+                width={24} 
+                height={24} 
+              />
+            </button>
+          </>
+        )}
       </div>
 
       {/* New Project Button */}
-      <button
-        onClick={onCreateProject}
-        style={{
-          margin: '0 24px 16px 24px',
-          padding: '0',
-          backgroundColor: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#3B82F6', // Blue color
-          textAlign: 'left',
-          fontFamily: 'inherit'
-        }}
-      >
-        <Image src="/NewProjectIcon.png" alt="New Project" width={20} height={20} />
-        New Project
-      </button>
+      <div style={{ 
+        position: 'relative',
+        margin: '0 8px 1px 8px'
+      }}>
+        <button
+          onMouseEnter={() => setHoveredButton('newProject')}
+          onMouseLeave={() => setHoveredButton(null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateProject();
+          }}
+          style={{
+            padding: '10px',
+            backgroundColor: hoveredButton === 'newProject' ? '#E5E7EB' : 'transparent',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#3B82F6',
+            fontFamily: 'inherit',
+            transition: 'background-color 0.15s ease',
+            width: '100%',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{ width: '24px', height: '24px', flexShrink: 0 }}>
+            <Image src="/NewProjectIcon.png" alt="New Project" width={24} height={24} />
+          </div>
+          <span style={{ 
+            whiteSpace: 'nowrap',
+            opacity: isCollapsed ? 0 : 1,
+            transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease',
+            width: isCollapsed ? 0 : 'auto'
+          }}>
+            New Project
+          </span>
+        </button>
+        {hoveredButton === 'newProject' && isCollapsed && (
+          <div style={{
+            position: 'absolute',
+            left: '100%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            marginLeft: '12px',
+            backgroundColor: '#000000',
+            color: '#ffffff',
+            padding: '4px 10px',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            New project
+          </div>
+        )}
+      </div>
 
       {/* Search Projects Button */}
-      <button
-        style={{
-          margin: '0 24px 32px 24px',
-          padding: '0',
-          backgroundColor: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#111827',
-          textAlign: 'left',
-          fontFamily: 'inherit'
-        }}
-      >
-        <Image src="/SearchIcon.png" alt="Search" width={16} height={16} style={{ opacity: 0.7 }} />
-        Search Projects
-      </button>
-
-      {/* Market Intelligence Section */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{
-          padding: '0 24px',
-          marginBottom: '12px',
-          fontSize: '11px',
-          fontWeight: '500',
-          color: '#9CA3AF',
-          letterSpacing: '0.05em'
-        }}>
-          Market Intelligence
-        </div>
+      <div style={{ 
+        position: 'relative',
+        margin: '0 8px 1px 8px'
+      }}>
         <button
+          onMouseEnter={() => setHoveredButton('search')}
+          onMouseLeave={() => setHoveredButton(null)}
+          onClick={(e) => e.stopPropagation()}
           style={{
-            margin: '0 24px',
-            padding: '0',
-            backgroundColor: 'transparent',
+            padding: '10px',
+            backgroundColor: hoveredButton === 'search' ? '#E5E7EB' : 'transparent',
             border: 'none',
+            borderRadius: '8px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -123,14 +230,45 @@ export default function LeftSidebar({
             fontSize: '14px',
             fontWeight: '500',
             color: '#111827',
-            textAlign: 'left',
             fontFamily: 'inherit',
-            width: 'calc(100% - 48px)'
+            transition: 'background-color 0.15s ease',
+            width: '100%',
+            overflow: 'hidden'
           }}
         >
-          <Image src="/TrendIcon.png" alt="Market Trends" width={16} height={16} style={{ opacity: 0.7 }} />
-          Market Trends
+          <div style={{ width: '24px', height: '24px', flexShrink: 0, opacity: 0.7 }}>
+            <Image src="/SearchIcon.png" alt="Search" width={24} height={24} />
+          </div>
+          <span style={{ 
+            whiteSpace: 'nowrap',
+            opacity: isCollapsed ? 0 : 1,
+            transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease',
+            width: isCollapsed ? 0 : 'auto'
+          }}>
+            Search Projects
+          </span>
         </button>
+        {hoveredButton === 'search' && isCollapsed && (
+          <div style={{
+            position: 'absolute',
+            left: '100%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            marginLeft: '12px',
+            backgroundColor: '#000000',
+            color: '#ffffff',
+            padding: '4px 10px',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}>
+            Search chats
+          </div>
+        )}
       </div>
 
       {/* Projects Section */}
@@ -138,24 +276,31 @@ export default function LeftSidebar({
         flex: 1,
         overflowY: 'auto',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        marginTop: '32px'
       }}>
         <div style={{
-          padding: '0 24px',
+          padding: '0 18px',
           marginBottom: '12px',
           fontSize: '11px',
           fontWeight: '500',
           color: '#9CA3AF',
-          letterSpacing: '0.05em'
+          letterSpacing: '0.05em',
+          opacity: isCollapsed ? 0 : 1,
+          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease'
         }}>
           Projects
         </div>
-        <div style={{ padding: '0 8px' }}>
-            <ProjectList
+        <div style={{ 
+          padding: '0 8px',
+          opacity: isCollapsed ? 0 : 1,
+          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease'
+        }}>
+          <ProjectList
             currentProjectId={currentProjectId}
             onSelectProject={onSelectProject}
             onCreateProject={onCreateProject}
-            />
+          />
         </div>
       </div>
     </aside>

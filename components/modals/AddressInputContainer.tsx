@@ -25,6 +25,7 @@ interface AddressInputContainerProps {
   }) => void;
   visible: boolean;
   position?: 'center' | 'top';
+  showHeader?: boolean;
 }
 
 interface AddressInput {
@@ -55,7 +56,8 @@ export default function AddressInputContainer({
   onAddressValidated,
   onAddressSubmitted,
   visible,
-  position = 'center'
+  position = 'center',
+  showHeader = false
 }: AddressInputContainerProps) {
   
   // Rate limiting: prevent duplicate submissions within 10 seconds
@@ -64,10 +66,13 @@ export default function AddressInputContainer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [assembleMode, setAssembleMode] = useState(false);
+  const [showBracket, setShowBracket] = useState(false);
   const [addressInputs, setAddressInputs] = useState<AddressInput[]>([
     { id: '1', address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
   ]);
   const [error, setError] = useState<string | null>(null);
+  const [moveExistingUp, setMoveExistingUp] = useState(false);
+  const previousInputCountRef = useRef(1);
   const searchTimeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
   const dropdownRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -96,6 +101,16 @@ export default function AddressInputContainer({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Update previous count after animation completes
+  useEffect(() => {
+    if (addressInputs.length > previousInputCountRef.current) {
+      const timer = setTimeout(() => {
+        previousInputCountRef.current = addressInputs.length;
+      }, 600); // Match fade-in animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [addressInputs.length]);
 
   const handleAddressChange = (id: string, value: string) => {
     setAddressInputs(inputs =>
@@ -264,32 +279,65 @@ export default function AddressInputContainer({
     if (assembleMode) {
       // Turn off assemble mode - keep only the first input with its data preserved
       setAssembleMode(false);
-      setAddressInputs([addressInputs[0]]);
+      setShowBracket(false);
+      setMoveExistingUp(false);
+      const firstInput = addressInputs[0];
+      setAddressInputs([firstInput]);
+      previousInputCountRef.current = 1;
     } else {
-      // Turn on assemble mode - add second input, preserve existing input
+      // Turn on assemble mode - trigger animation sequence
       setAssembleMode(true);
+      setShowBracket(true);
+      
+      // Trigger move-up animation
+      setMoveExistingUp(true);
+      
+      // Add second input after brief delay
       if (addressInputs.length === 1) {
-        setAddressInputs([
-          ...addressInputs,
-          { id: Date.now().toString(), address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
-        ]);
+        setTimeout(() => {
+          setAddressInputs([
+            ...addressInputs,
+            { id: Date.now().toString(), address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
+          ]);
+          previousInputCountRef.current = 2;
+          
+          // Reset move-up state after animation
+          setTimeout(() => {
+            setMoveExistingUp(false);
+          }, 150);
+        }, 10);
       }
     }
   };
 
   const handleAddInput = () => {
-    setAddressInputs([
-      ...addressInputs,
-      { id: Date.now().toString(), address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
-    ]);
+    // Trigger move-up animation for existing containers
+    setMoveExistingUp(true);
+    
+    // Add new input after a brief delay
+    setTimeout(() => {
+      const newInputs = [
+        ...addressInputs,
+        { id: Date.now().toString(), address: '', validatedAddress: null, suggestions: [], showSuggestions: false }
+      ];
+      setAddressInputs(newInputs);
+      
+      // Reset move-up state after animation
+      setTimeout(() => {
+        setMoveExistingUp(false);
+      }, 150);
+    }, 10);
   };
 
   const handleRemoveInput = (id: string) => {
     if (addressInputs.length === 1) return;
-    setAddressInputs(addressInputs.filter(input => input.id !== id));
-    if (addressInputs.length === 2) {
+    const newInputs = addressInputs.filter(input => input.id !== id);
+    setAddressInputs(newInputs);
+    previousInputCountRef.current = newInputs.length;
+    if (newInputs.length === 1) {
       // Going back to single input, turn off assemble mode
       setAssembleMode(false);
+      setShowBracket(false);
     }
   };
 
@@ -396,53 +444,113 @@ export default function AddressInputContainer({
       maxWidth: '700px',
       animation: position === 'top' ? 'slideDown 0.3s ease-out' : 'fadeIn 0.3s ease-out',
     }}>
+      {/* Header Text */}
+      {showHeader && (
+        <h1 style={{
+          fontSize: '28px',
+          fontWeight: '400',
+          color: '#111827',
+          margin: 0,
+          marginBottom: '36px',
+          textAlign: 'center',
+          letterSpacing: '-0.02em',
+          transform: (moveExistingUp && assembleMode) ? 'translateY(-35px)' : 'translateY(0)',
+          transition: 'transform 0.15s ease-out'
+        }}>
+          What address are we exploring today?
+        </h1>
+      )}
+      
       {/* Address Inputs Container */}
       <div style={{
         position: 'relative',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
-        marginLeft: assembleMode && addressInputs.length > 1 ? '50px' : '0',
-        transition: 'margin-left 0.3s ease'
+        gap: '12px',
+        overflow: 'visible'
       }}>
         {/* Left Arrow Bracket */}
-        {assembleMode && addressInputs.length > 1 && (
-          <svg 
-            width="35" 
-            height={addressInputs.length * 70}
-            style={{
-              position: 'absolute',
-              left: '-45px',
-              top: '0',
-              zIndex: 1
-            }}
-            viewBox={`0 0 35 ${addressInputs.length * 70}`}
-          >
-            <path
-              d={`M 30 5 L 8 5 L 8 ${addressInputs.length * 70 - 5} L 30 ${addressInputs.length * 70 - 5}`}
-              stroke="#374151"
-              strokeWidth="1.5"
-              fill="none"
-              strokeLinecap="square"
-            />
-            <path
-              d="M 30 5 L 30 8"
-              stroke="#374151"
-              strokeWidth="1.5"
-              strokeLinecap="square"
-            />
-            <path
-              d={`M 30 ${addressInputs.length * 70 - 5} L 30 ${addressInputs.length * 70 - 8}`}
-              stroke="#374151"
-              strokeWidth="1.5"
-              strokeLinecap="square"
-            />
-          </svg>
-        )}
+        {showBracket && (() => {
+          // Calculate dynamic bracket height based on number of inputs
+          const containerHeight = 55; // Input container height (accounts for padding + content)
+          const gap = 12; // Gap between containers
+          const inputRowHeight = containerHeight + gap; // 67px per row
+          const centerOffset = 27.5; // Center of each container
+          
+          // Vertical span from first center to last center
+          const spanHeight = (addressInputs.length - 1) * inputRowHeight;
+          
+          // Total bracket SVG height (add padding for the arrows)
+          const bracketHeight = spanHeight + 20;
+          const verticalLineHeight = spanHeight;
+          const pathLength = 22 + verticalLineHeight + 22;
+          
+          return (
+            <div 
+              key={addressInputs.length} // Re-render and re-animate when count changes
+              style={{ 
+                position: 'absolute', 
+                left: '-45px', 
+                top: `${centerOffset}px`, // Position at first container's center
+                zIndex: 1,
+                transition: 'height 0.3s ease-out'
+              }}
+            >
+              <svg 
+                width="35" 
+                height={bracketHeight}
+                viewBox={`0 0 35 ${bracketHeight}`}
+              >
+                <path
+                  className="bracket-main"
+                  d={`M 30 10 L 8 10 L 8 ${verticalLineHeight + 10} L 30 ${verticalLineHeight + 10}`}
+                  stroke="#374151"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="square"
+                  strokeDasharray={pathLength}
+                  strokeDashoffset={pathLength}
+                />
+                <path
+                  className="bracket-top"
+                  d="M 30 10 L 30 6"
+                  stroke="#374151"
+                  strokeWidth="1.5"
+                  strokeLinecap="square"
+                  strokeDasharray="4"
+                  strokeDashoffset="4"
+                />
+                <path
+                  className="bracket-bottom"
+                  d={`M 30 ${verticalLineHeight + 10} L 30 ${verticalLineHeight + 14}`}
+                  stroke="#374151"
+                  strokeWidth="1.5"
+                  strokeLinecap="square"
+                  strokeDasharray="4"
+                  strokeDashoffset="4"
+                />
+              </svg>
+            </div>
+          );
+        })()}
 
-        {addressInputs.map((input, index) => (
-          <div key={input.id} style={{ position: 'relative', zIndex: input.showSuggestions ? 30 : 1 }}>
+        {addressInputs.map((input, index) => {
+          const isNewInput = index >= previousInputCountRef.current;
+          const isExistingInput = !isNewInput;
+          
+          return (
+          <div 
+            key={input.id}
+            style={{ 
+              position: 'relative', 
+              zIndex: input.showSuggestions ? 30 : 1,
+              animation: isNewInput ? 'fadeInInput 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards' : 'none',
+              opacity: isNewInput ? 0 : 1,
+              transform: (isExistingInput && moveExistingUp) ? 'translateY(-35px)' : 'translateY(0)',
+              transition: isExistingInput ? 'transform 0.15s ease-out' : 'none'
+            }}
+          >
             {/* Input Container */}
             <div style={{
               position: 'relative',
@@ -462,7 +570,7 @@ export default function AddressInputContainer({
               <input
                 ref={(el) => { inputRefs.current.set(input.id, el); }}
                 type="text"
-                placeholder="Input Address"
+                placeholder="Input any address"
                 value={input.address}
                 onChange={(e) => handleAddressChange(input.id, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(input.id, e)}
@@ -478,11 +586,12 @@ export default function AddressInputContainer({
                     );
                   }
                 }}
+                className="address-input"
                 style={{
                   flex: 1,
                   border: 'none',
                   outline: 'none',
-                  fontSize: '15px',
+                  fontSize: '14px',
                   color: '#000000',
                   backgroundColor: 'transparent',
                   fontFamily: 'inherit'
@@ -496,7 +605,7 @@ export default function AddressInputContainer({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '10px 20px',
+                  padding: '6px 12px',
                   borderRadius: '50px',
                   border: assembleMode ? '2px solid #5B9EFF' : '1px solid #D1D5DB',
                   backgroundColor: assembleMode ? '#D6E4FF' : '#ffffff',
@@ -504,7 +613,7 @@ export default function AddressInputContainer({
                   fontSize: '14px',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   outline: 'none',
                   flexShrink: 0
                 }}
@@ -618,7 +727,8 @@ export default function AddressInputContainer({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {/* Add button (Plus) - only show in assemble mode */}
         {assembleMode && (
@@ -693,6 +803,42 @@ export default function AddressInputContainer({
             opacity: 1;
             transform: translateY(0);
           }
+        }
+        
+        @keyframes drawBracket {
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+        
+        @keyframes fadeInInput {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .bracket-main {
+          animation: drawBracket 0.6s ease-out forwards;
+        }
+        
+        .bracket-top {
+          animation: drawBracket 0.1s ease-out forwards;
+          animation-delay: 0s;
+        }
+        
+        .bracket-bottom {
+          animation: drawBracket 0.1s ease-out forwards;
+          animation-delay: 0.5s;
+        }
+        
+        .address-input::placeholder {
+          color: #9CA3AF;
+          font-size: 15px;
         }
       `}</style>
     </div>
