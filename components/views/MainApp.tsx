@@ -6,6 +6,7 @@ import AddressList from '@/components/modals/AddressList';
 import MapView from './MapView';
 import ChatBot from './ChatBot';
 import { Address, projectsAPI, addressesAPI } from '@/lib/api-client';
+import { generateProjectName } from '@/lib/project-utils';
 
 type ViewState = 'input' | 'building' | 'viewing';
 
@@ -94,6 +95,19 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
       const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
       setAddresses([...addresses, newAddress]);
       
+      // Auto-update project name if this is the first address
+      if (addresses.length === 0) {
+        try {
+          const generatedName = generateProjectName(validatedAddress);
+          await projectsAPI.update(projectId, generatedName);
+          setProjectName(generatedName);
+          console.log('Project name auto-updated to:', generatedName);
+        } catch (error) {
+          console.error('Failed to update project name:', error);
+          // Don't fail the whole operation if naming fails
+        }
+      }
+      
       // Transition to building state and hide input (for assembling more)
       setViewState('building');
       setShowInput(false);
@@ -143,6 +157,19 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
       const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
       console.log('Address added successfully with boundary data:', newAddress);
       setAddresses([...addresses, newAddress]);
+      
+      // Auto-update project name if this is the first address
+      if (addresses.length === 0) {
+        try {
+          const generatedName = generateProjectName(validatedAddress);
+          await projectsAPI.update(projectId, generatedName);
+          setProjectName(generatedName);
+          console.log('Project name auto-updated to:', generatedName);
+        } catch (error) {
+          console.error('Failed to update project name:', error);
+          // Don't fail the whole operation if naming fails
+        }
+      }
       
       // Go straight to viewing (Enter key behavior)
       setViewState('viewing');
