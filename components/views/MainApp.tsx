@@ -4,10 +4,7 @@ import React, { useState, useEffect } from 'react';
 import AddressInputContainer from '@/components/modals/AddressInputContainer';
 import AddressList from '@/components/modals/AddressList';
 import MapView from './MapView';
-import AssemblyDataView from './AssemblyDataView';
-import ChatView from './ChatView';
-import ViewToggleBanner, { ViewType } from './ViewToggleBanner';
-import RightSidebar from './RightSidebar';
+import ChatBot from './ChatBot';
 import { Address, projectsAPI, addressesAPI } from '@/lib/api-client';
 
 type ViewState = 'input' | 'building' | 'viewing';
@@ -20,11 +17,10 @@ interface MainAppProps {
 
 export default function MainApp({ currentProjectId, onProjectChange, onCreateProjectWithAddress }: MainAppProps) {
   const [viewState, setViewState] = useState<ViewState>('input');
-  const [dataViewType, setDataViewType] = useState<ViewType>('map');
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [showInput, setShowInput] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false); // Default closed as requested
+  const [projectName, setProjectName] = useState<string>('');
   
   // Rate limiting for submissions
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
@@ -32,15 +28,10 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
   // Load project data when project changes
   useEffect(() => {
     if (currentProjectId) {
-      // IMPORTANT: Set UI state FIRST before loading data
-      setIsChatOpen(false); // Always close sidebar when switching projects
-      setDataViewType('map'); // Reset to map view when switching projects
-      // Then load the project data
+      // Load the project data
       loadProjectData(currentProjectId);
     } else {
       // Reset to initial state if no project
-      setIsChatOpen(false);
-      setDataViewType('map');
       setAddresses([]);
       setViewState('input');
       setShowInput(true);
@@ -52,13 +43,14 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
     try {
       const project = await projectsAPI.get(projectId);
       setAddresses(project.addresses);
+      setProjectName(project.name || 'Untitled Project');
       
       // Determine view state based on addresses
       if (project.addresses.length === 0) {
         setViewState('input');
         setShowInput(true);
       } else {
-        // Go straight to map view for existing projects
+        // Go straight to viewing for existing projects
         setViewState('viewing');
         setShowInput(false);
       }
@@ -93,6 +85,10 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
         console.log('No project exists, creating new project...');
         projectId = await onCreateProjectWithAddress();
         console.log('New project created:', projectId);
+        
+        // Fetch the project to get its name
+        const project = await projectsAPI.get(projectId);
+        setProjectName(project.name || 'Untitled Project');
       }
       
       const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
@@ -137,6 +133,10 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
         console.log('No project exists, creating new project...');
         projectId = await onCreateProjectWithAddress();
         console.log('New project created:', projectId);
+        
+        // Fetch the project to get its name
+        const project = await projectsAPI.get(projectId);
+        setProjectName(project.name || 'Untitled Project');
       }
       
       console.log('Fetching address boundary and parcel data...');
@@ -144,7 +144,7 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
       console.log('Address added successfully with boundary data:', newAddress);
       setAddresses([...addresses, newAddress]);
       
-      // Go straight to map view (Enter key behavior)
+      // Go straight to viewing (Enter key behavior)
       setViewState('viewing');
       
       // Notify parent to refresh project list
@@ -277,24 +277,6 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
       });
   };
 
-  const handleViewChange = (view: ViewType) => {
-    setDataViewType(view);
-    // Close sidebar when switching to chat view
-    if (view === 'chat') {
-      setIsChatOpen(false);
-    }
-  };
-
-  const handleToggleSidebar = () => {
-    const newState = !isChatOpen;
-    setIsChatOpen(newState);
-    
-    // If closing the sidebar and chat was selected, switch to map view
-    if (!newState && dataViewType === 'chat') {
-      setDataViewType('map');
-    }
-  };
-
   // If no project selected, show address input to create one
   if (!currentProjectId) {
     return (
@@ -409,82 +391,42 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
     );
   }
 
-  // Viewing state - show map or data view
+  // Viewing state - show chatbot and map side by side
   if (viewState === 'viewing') {
     return (
       <main style={{
         flex: 1,
         display: 'flex',
-        flexDirection: 'column',
         overflow: 'hidden',
         backgroundColor: '#ffffff'
       }}>
-        {/* View Toggle Banner */}
-        <ViewToggleBanner
-          currentView={dataViewType}
-          onViewChange={handleViewChange}
-          addressCount={addresses.length}
-          isSidebarOpen={isChatOpen}
-          onToggleSidebar={handleToggleSidebar}
-        />
-
+        {/* ChatBot on the left */}
         <div style={{
-            flex: 1,
-            display: 'flex',
-            overflow: 'hidden',
-            position: 'relative',
-            isolation: 'isolate'
+          width: '400px',
+          minWidth: '400px',
+          maxWidth: '400px',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
-            {/* Main Content Area */}
-            <div style={{
-                flex: 1,
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column'
-            }}>
-                {/* Map View */}
-                {dataViewType === 'map' && (
-                <MapView 
-                    addresses={addresses} 
-                    onBack={handleBackFromMap} 
-                    onAddAddress={handleAddAddressFromMap}
-                    onRemoveAddress={handleRemoveAddress}
-                />
-                )}
+          <ChatBot 
+            addresses={addresses}
+            projectName={projectName}
+          />
+        </div>
 
-                {/* Data View */}
-                {dataViewType === 'data' && (
-                <AssemblyDataView addresses={addresses} />
-                )}
-
-                {/* Chat View - Full screen LLM chat interface */}
-                {dataViewType === 'chat' && (
-                <ChatView addresses={addresses} />
-                )}
-            </div>
-
-            {/* Right Sidebar (Chat) - Slides in/out (hidden when in chat view) */}
-            {dataViewType !== 'chat' && (
-              <div 
-                  style={{
-                      position: 'fixed',
-                      right: 0,
-                      top: '56px',
-                      bottom: 0,
-                      width: '360px',
-                      transform: isChatOpen ? 'translateX(0)' : 'translateX(100%)',
-                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      zIndex: 20,
-                      pointerEvents: isChatOpen ? 'auto' : 'none'
-                  }}
-              >
-                  <RightSidebar
-                      addresses={addresses}
-                      isOpen={isChatOpen}
-                      onClose={() => setIsChatOpen(false)}
-                  />
-              </div>
-            )}
+        {/* MapView on the right */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          <MapView 
+            addresses={addresses} 
+            onBack={handleBackFromMap} 
+            onAddAddress={handleAddAddressFromMap}
+            onRemoveAddress={handleRemoveAddress}
+          />
         </div>
       </main>
     );

@@ -294,7 +294,8 @@ export default function LeftSidebar({
         <div style={{ 
           padding: '0 8px',
           opacity: isCollapsed ? 0 : 1,
-          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease'
+          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease',
+          pointerEvents: isCollapsed ? 'none' : 'auto'
         }}>
           <ProjectList
             currentProjectId={currentProjectId}

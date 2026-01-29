@@ -543,7 +543,8 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
       width: '100%',
       height: '100%',
       display: 'flex',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
       {/* Map Container */}
       <div style={{
@@ -551,6 +552,15 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
         position: 'relative',
         height: '100%'
       }}>
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          right: '-200px',
+          top: 0,
+          bottom: 0,
+          width: 'calc(100% + 200px)',
+          height: '100%'
+        }}>
         <Map
           ref={mapRef}
           mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example'}
@@ -559,7 +569,8 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             latitude: center[1],
             zoom: zoom
           }}
-          mapStyle="mapbox://styles/mapbox/light-v11"
+          style={{ width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
           cursor={cursor}
           interactiveLayerIds={['main-parcels-fill', 'surrounding-parcels-fill']}
           onClick={handleMapClick}
@@ -586,6 +597,7 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             <Layer {...mainParcelLineLayer} />
           </Source>
         </Map>
+        </div>
 
         {/* Wetlands Control Panel */}
         <EnvironmentalLayersPanel
