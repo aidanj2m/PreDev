@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { addressesAPI } from '@/lib/api-client';
+import { validateAddressClientSide } from '@/lib/mapbox-client';
 import Image from 'next/image';
 
 interface AddressInputContainerProps {
@@ -76,6 +77,7 @@ export default function AddressInputContainer({
   const searchTimeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const inputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
   const dropdownRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const suggestionCache = useRef<Map<string, any>>(new Map());
 
   // Handle clicks outside to close suggestions
   useEffect(() => {
@@ -121,8 +123,8 @@ export default function AddressInputContainer({
       )
     );
 
-    // Debounced autocomplete
-    if (value.length < 3) {
+    // Debounced autocomplete - start after 2 characters for faster results
+    if (value.length < 2) {
       setAddressInputs(inputs =>
         inputs.map(input =>
           input.id === id
@@ -138,9 +140,35 @@ export default function AddressInputContainer({
 
     const newTimeout = setTimeout(async () => {
       try {
+        // Check cache first
+        const cacheKey = value.toLowerCase().trim();
+        const cached = suggestionCache.current.get(cacheKey);
+        
+        if (cached) {
+          console.log('Using cached suggestions for:', value);
+          setAddressInputs(inputs =>
+            inputs.map(input =>
+              input.id === id
+                ? { ...input, suggestions: cached, showSuggestions: true }
+                : input
+            )
+          );
+          setError(null);
+          return;
+        }
+
         console.log('Fetching suggestions for:', value);
-        const validation = await addressesAPI.validate(value);
-        console.log('Validation response:', validation);
+        
+        // Try client-side Mapbox first (faster), fallback to backend
+        let validation;
+        try {
+          validation = await validateAddressClientSide(value);
+          console.log('Client-side validation response:', validation);
+        } catch (clientError) {
+          console.warn('Client-side validation failed, falling back to backend:', clientError);
+          validation = await addressesAPI.validate(value);
+          console.log('Backend validation response:', validation);
+        }
 
         if (validation.valid && validation.formatted_address) {
           const results = [{
@@ -154,16 +182,32 @@ export default function AddressInputContainer({
           }];
 
           validation.suggestions.forEach(sugg => {
-            results.push({
-              full_address: sugg,
-              street: '',
-              city: '',
-              state: '',
-              zip_code: '',
-              latitude: undefined,
-              longitude: undefined,
-            });
+            // Handle both client-side (object) and backend (string) suggestions
+            if (typeof sugg === 'string') {
+              results.push({
+                full_address: sugg,
+                street: '',
+                city: '',
+                state: '',
+                zip_code: '',
+                latitude: undefined,
+                longitude: undefined,
+              });
+            } else {
+              results.push({
+                full_address: sugg.full_address,
+                street: sugg.street,
+                city: sugg.city,
+                state: sugg.state,
+                zip_code: sugg.zip_code,
+                latitude: sugg.latitude,
+                longitude: sugg.longitude,
+              });
+            }
           });
+
+          // Cache the results
+          suggestionCache.current.set(cacheKey, results);
 
           console.log('Setting suggestions:', results);
           setAddressInputs(inputs =>
@@ -181,7 +225,7 @@ export default function AddressInputContainer({
         console.error('Autocomplete error:', err);
         setError(`Failed to fetch suggestions: ${err instanceof Error ? err.message : String(err)}`);
       }
-    }, 500);
+    }, 150);
 
     searchTimeoutRefs.current.set(id, newTimeout);
   };
