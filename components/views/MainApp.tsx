@@ -391,30 +391,17 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
     );
   }
 
-  // Viewing state - show chatbot and map side by side
+  // Viewing state - show map with floating chatbot overlay
   if (viewState === 'viewing') {
     return (
       <main style={{
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        position: 'relative'
       }}>
-        {/* ChatBot on the left */}
-        <div style={{
-          width: '400px',
-          minWidth: '400px',
-          maxWidth: '400px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <ChatBot 
-            addresses={addresses}
-            projectName={projectName}
-          />
-        </div>
-
-        {/* MapView on the right */}
+        {/* MapView - full width */}
         <div style={{
           flex: 1,
           display: 'flex',
@@ -428,6 +415,12 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
             onRemoveAddress={handleRemoveAddress}
           />
         </div>
+
+        {/* Floating ChatBot overlay */}
+        <ChatBot 
+          addresses={addresses}
+          projectName={projectName}
+        />
       </main>
     );
   }

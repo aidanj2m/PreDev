@@ -412,7 +412,7 @@ export const environmentalAPI = {
 
   /**
    * Get NJ wetlands within a bounding box directly from Supabase.
-   * Much faster than the old NWI API approach.
+   * Uses NJDEP Wetlands 2020 data.
    * 
    * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
    * @param options Optional filters
@@ -420,7 +420,7 @@ export const environmentalAPI = {
   async getNJWetlandsInBbox(
     bbox: [number, number, number, number],
     options: {
-      wetlandType?: string;
+      wetlandLabel?: string;  // Filter by wetland classification (partial match)
       limit?: number;
     } = {}
   ): Promise<GeoJSONFeatureCollection> {
@@ -431,16 +431,17 @@ export const environmentalAPI = {
       max_lon: String(maxLon),
       max_lat: String(maxLat),
     });
-    
-    if (options.wetlandType) {
-      params.append('wetland_type', options.wetlandType);
+
+    if (options.wetlandLabel) {
+      params.append('wetland_label', options.wetlandLabel);
     }
     if (options.limit) {
       params.append('limit', String(options.limit));
     }
-    
+
     return fetchAPI(`/nj-wetlands?${params.toString()}`);
   },
+
 
   /**
    * Get all wetland types with colors for the legend.
@@ -473,5 +474,32 @@ export const environmentalAPI = {
     note: string;
   }> {
     return fetchAPI('/nj-wetlands/info');
+  },
+
+  /**
+   * Get NJ Redevelopment Zones within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJRedevZonesInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-redev-zones?${params.toString()}`);
   },
 };

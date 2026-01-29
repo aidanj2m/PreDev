@@ -75,8 +75,8 @@ export default function LeftSidebar({
               flexShrink: 0
             }}>
               <Image 
-                src={isSidebarHovered ? "/rightSidebarIcon.png" : "/PreDevLogo.png"}
-                alt={isSidebarHovered ? "Expand" : "PreDev Logo"}
+                src={isSidebarHovered ? "/rightSidebarIcon.png" : "/EntitelyLogo.png"}
+                alt={isSidebarHovered ? "Expand" : "Entitely Logo"}
                 width={24} 
                 height={24} 
               />
@@ -98,8 +98,8 @@ export default function LeftSidebar({
                 flexShrink: 0
               }}>
                 <Image 
-                  src="/PreDevLogo.png"
-                  alt="PreDev Logo"
+                  src="/EntitelyLogo.png"
+                  alt="Entitely Logo"
                   width={24} 
                   height={24} 
                 />

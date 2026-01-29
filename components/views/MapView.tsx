@@ -13,7 +13,9 @@ import {
   surroundingParcelFillLayer,
   surroundingParcelLineLayer,
   wetlandsFillLayer,
-  wetlandsLineLayer
+  wetlandsLineLayer,
+  redevZonesFillLayer,
+  redevZonesLineLayer
 } from '@/lib/map-layer-styles';
 
 interface MapViewProps {
@@ -68,6 +70,11 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
   const [showWetlandsLegend, setShowWetlandsLegend] = useState(false);
   const [autoRefreshWetlands, setAutoRefreshWetlands] = useState(false);
 
+  // Redevelopment Zones state
+  const [showRedevZones, setShowRedevZones] = useState(false);
+  const [redevZones, setRedevZones] = useState<GeoJSONFeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const [isLoadingRedevZones, setIsLoadingRedevZones] = useState(false);
+
   // Calculate center and zoom from addresses
   const validCoords = addresses.filter(a => a.latitude && a.longitude);
   let center: [number, number] = [-98.5795, 39.8283]; // Center of US as default
@@ -113,9 +120,9 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     try {
       const map = mapRef.current.getMap();
       const bounds = map.getBounds();
-      
+
       if (!bounds) return;
-      
+
       const bbox: [number, number, number, number] = [
         bounds.getWest(),
         bounds.getSouth(),
@@ -135,11 +142,40 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     }
   }, [showWetlands]);
 
+  // Function to fetch redev zones in current viewport
+  const fetchRedevZonesInViewport = useCallback(async () => {
+    if (!showRedevZones || !mapRef.current) return;
+
+    try {
+      const map = mapRef.current.getMap();
+      const bounds = map.getBounds();
+
+      if (!bounds) return;
+
+      const bbox: [number, number, number, number] = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ];
+
+      console.log('Fetching redev zones in viewport:', bbox);
+      const redevData = await environmentalAPI.getNJRedevZonesInBbox(bbox, {
+        limit: 1000
+      });
+
+      setRedevZones(redevData);
+      console.log(`✓ Loaded ${redevData.features.length} redev zone features in viewport`);
+    } catch (err) {
+      console.error('Error loading redev zones:', err);
+    }
+  }, [showRedevZones]);
+
   // Load wetland types for legend
   useEffect(() => {
     const loadWetlandTypes = async () => {
       if (!showWetlands) return;
-      
+
       try {
         const result = await environmentalAPI.getWetlandTypes();
         setWetlandTypes(result.wetland_types);
@@ -173,15 +209,54 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     loadWetlands();
   }, [showWetlands, fetchWetlandsInViewport]);
 
+  // Load redevelopment zones when toggled on
+  useEffect(() => {
+    const loadRedevZones = async () => {
+      if (!showRedevZones) return;
+
+      setIsLoadingRedevZones(true);
+      try {
+        await fetchRedevZonesInViewport();
+      } catch (error) {
+        console.error('Error loading redev zones:', error);
+      } finally {
+        setIsLoadingRedevZones(false);
+      }
+    };
+
+    loadRedevZones();
+  }, [showRedevZones, fetchRedevZonesInViewport]);
+
+  // Auto-refresh redev zones when map moves (if enabled - reusing wetlands auto-refresh setting for now or just always auto-refreshing when on)
+  useEffect(() => {
+    if (!showRedevZones || !mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    let timeoutId: NodeJS.Timeout;
+
+    const handleMoveEnd = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetchRedevZonesInViewport();
+      }, 500);
+    };
+
+    map.on('moveend', handleMoveEnd);
+    return () => {
+      map.off('moveend', handleMoveEnd);
+      clearTimeout(timeoutId);
+    };
+  }, [showRedevZones, fetchRedevZonesInViewport]);
+
   // Auto-refresh wetlands when map moves (if enabled)
   useEffect(() => {
     if (!autoRefreshWetlands || !showWetlands || !mapRef.current) return;
 
     const map = mapRef.current.getMap();
-    
+
     // Debounce the refresh to avoid too many API calls
     let timeoutId: NodeJS.Timeout;
-    
+
     const handleMoveEnd = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
@@ -190,7 +265,7 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
     };
 
     map.on('moveend', handleMoveEnd);
-    
+
     return () => {
       map.off('moveend', handleMoveEnd);
       clearTimeout(timeoutId);
@@ -487,7 +562,7 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
 
   // Determine if we're still loading critical data
   const isInitialLoading = isLoadingBoundaries || (addresses.length > 0 && mainParcels.features.length === 0);
-  
+
   // Show loading screen while fetching initial data
   if (isInitialLoading) {
     return (
@@ -561,42 +636,50 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
           width: 'calc(100% + 200px)',
           height: '100%'
         }}>
-        <Map
-          ref={mapRef}
-          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example'}
-          initialViewState={{
-            longitude: center[0],
-            latitude: center[1],
-            zoom: zoom
-          }}
-          style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-          cursor={cursor}
-          interactiveLayerIds={['main-parcels-fill', 'surrounding-parcels-fill']}
-          onClick={handleMapClick}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Wetlands layer */}
-          {showWetlands && (
-            <Source id="wetlands" type="geojson" data={wetlands}>
-              <Layer {...wetlandsFillLayer} />
-              <Layer {...wetlandsLineLayer} />
+          <Map
+            ref={mapRef}
+            mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example'}
+            initialViewState={{
+              longitude: center[0],
+              latitude: center[1],
+              zoom: zoom
+            }}
+            style={{ width: '100%', height: '100%' }}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            cursor={cursor}
+            interactiveLayerIds={['main-parcels-fill', 'surrounding-parcels-fill']}
+            onClick={handleMapClick}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* Wetlands layer */}
+            {showWetlands && (
+              <Source id="wetlands" type="geojson" data={wetlands}>
+                <Layer {...wetlandsFillLayer} />
+                <Layer {...wetlandsLineLayer} />
+              </Source>
+            )}
+
+            {/* Redevelopment Zones layer */}
+            {showRedevZones && (
+              <Source id="redev-zones" type="geojson" data={redevZones}>
+                <Layer {...redevZonesFillLayer} />
+                <Layer {...redevZonesLineLayer} />
+              </Source>
+            )}
+
+            {/* Surrounding parcels */}
+            <Source id="surrounding-parcels" type="geojson" data={surroundingParcels}>
+              <Layer {...surroundingParcelFillLayer} />
+              <Layer {...surroundingParcelLineLayer} />
             </Source>
-          )}
 
-          {/* Surrounding parcels */}
-          <Source id="surrounding-parcels" type="geojson" data={surroundingParcels}>
-            <Layer {...surroundingParcelFillLayer} />
-            <Layer {...surroundingParcelLineLayer} />
-          </Source>
-
-          {/* Main parcels (on top) */}
-          <Source id="main-parcels" type="geojson" data={mainParcels}>
-            <Layer {...mainParcelFillLayer} />
-            <Layer {...mainParcelLineLayer} />
-          </Source>
-        </Map>
+            {/* Main parcels (on top) */}
+            <Source id="main-parcels" type="geojson" data={mainParcels}>
+              <Layer {...mainParcelFillLayer} />
+              <Layer {...mainParcelLineLayer} />
+            </Source>
+          </Map>
         </div>
 
         {/* Wetlands Control Panel */}
@@ -610,7 +693,12 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
           onRefreshWetlands={fetchWetlandsInViewport}
           autoRefreshWetlands={autoRefreshWetlands}
           onAutoRefreshChange={setAutoRefreshWetlands}
-          isLoading={isLoadingEnvLayers}
+          isLoading={isLoadingEnvLayers || isLoadingRedevZones}
+
+          // Redevelopment Zones Props
+          showRedevZones={showRedevZones}
+          onRedevZonesChange={setShowRedevZones}
+          redevZoneCount={redevZones.features.length}
         />
 
         {/* Parcel Preview Modal (Quick Access Data) */}
