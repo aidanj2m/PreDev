@@ -277,7 +277,7 @@ export default function EnvironmentalLayersPanel({
               borderRadius: 3,
               border: '1px solid rgba(0,0,0,0.2)'
             }} />
-            NJ Wetlands (2020)
+            NJ Wetlands
             {showWetlands && wetlandCount > 0 && (
               <span style={{
                 fontSize: 10,
@@ -340,43 +340,7 @@ export default function EnvironmentalLayersPanel({
                 {showWetlandsLegend ? 'Hide Legend' : 'Show Legend'} ({wetlandTypes.length} types)
               </button>
 
-              {/* Control Buttons Row */}
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button
-                  onClick={onRefreshWetlands}
-                  disabled={isLoading}
-                  style={{
-                    fontSize: 11,
-                    padding: '5px 10px',
-                    backgroundColor: isLoading ? '#9CA3AF' : '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    flex: 1
-                  }}
-                >
-                  {isLoading ? '⟳ Loading...' : '⟳ Refresh'}
-                </button>
-
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 10,
-                  color: '#6B7280',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={autoRefreshWetlands}
-                    onChange={(e) => onAutoRefreshChange(e.target.checked)}
-                    style={{ width: 12, height: 12, cursor: 'pointer' }}
-                  />
-                  Auto
-                </label>
-              </div>
+              {/* Auto-refresh is now always enabled for better UX */}
             </div>
           )}
 

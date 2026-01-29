@@ -68,7 +68,7 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
   const [isLoadingEnvLayers, setIsLoadingEnvLayers] = useState(false);
   const [wetlandTypes, setWetlandTypes] = useState<any[]>([]);
   const [showWetlandsLegend, setShowWetlandsLegend] = useState(false);
-  const [autoRefreshWetlands, setAutoRefreshWetlands] = useState(false);
+  const [autoRefreshWetlands, setAutoRefreshWetlands] = useState(true);
 
   // Redevelopment Zones state
   const [showRedevZones, setShowRedevZones] = useState(false);
