@@ -502,4 +502,281 @@ export const environmentalAPI = {
 
     return fetchAPI(`/nj-redev-zones?${params.toString()}`);
   },
+
+  /**
+   * Get NJ CAFRA Centers within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   */
+  async getNJCafraCentersInBbox(
+    bbox: [number, number, number, number]
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    return fetchAPI(`/nj-cafra-centers?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Hydrography (Streams & Waterbodies) within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJHydrographyInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      layers?: string[]; // 'stream', 'waterbody'
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.layers && options.layers.length > 0) {
+      options.layers.forEach(layer => params.append('layers', layer));
+    }
+
+    return fetchAPI(`/nj-hydrography?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Hazardous Waste Sites within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJHazardousWasteSitesInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-hazardous-waste-sites?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Brownfield Sites within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJBrownfieldSitesInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-brownfield-sites?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Contaminated Sites within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJContaminatedSitesInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-contaminated-sites?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Pinelands Management Areas within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   */
+  async getNJPinelandsAreasInBbox(
+    bbox: [number, number, number, number]
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    return fetchAPI(`/nj-pinelands-areas?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ BDA Block/Lot Polygons within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJBDABlockLotsInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-bda-blocklots?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Category One (C1) Waters within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJC1WatersInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-c1-waters?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Highlands Preservation/Planning Areas within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   */
+  async getNJHighlandsAreasInBbox(
+    bbox: [number, number, number, number]
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    return fetchAPI(`/nj-highlands-areas?${params.toString()}`);
+  },
+
+  /**
+   * Get NJ Flood Hazard Sites within a bounding box.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNJFloodHazardSitesInBbox(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nj-flood-hazard-sites?${params.toString()}`);
+  },
+};
+
+// Parcels API methods
+export const parcelsAPI = {
+  /**
+   * Get nearby parcels within a bounding box.
+   * First checks database for cached parcels, then fetches from Lightbox if needed.
+   * 
+   * @param bbox Bounding box [minLon, minLat, maxLon, maxLat]
+   * @param options Optional filters
+   */
+  async getNearbyParcels(
+    bbox: [number, number, number, number],
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<GeoJSONFeatureCollection> {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const params = new URLSearchParams({
+      min_lon: String(minLon),
+      min_lat: String(minLat),
+      max_lon: String(maxLon),
+      max_lat: String(maxLat),
+    });
+
+    if (options.limit) {
+      params.append('limit', String(options.limit));
+    }
+
+    return fetchAPI(`/nearby-parcels?${params.toString()}`);
+  },
 };

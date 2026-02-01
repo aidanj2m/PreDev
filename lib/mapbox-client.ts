@@ -60,12 +60,6 @@ export async function validateAddressClientSide(address: string): Promise<Mapbox
     // Parse best match (first result)
     const bestMatch = features[0];
     const coordinates = bestMatch.geometry?.coordinates || [];
-    let placeName = bestMatch.place_name || '';
-    
-    // Remove ", United States" suffix
-    if (placeName.endsWith(', United States')) {
-      placeName = placeName.slice(0, -16);
-    }
 
     // Parse address components from context
     const context = bestMatch.context || [];
@@ -78,23 +72,36 @@ export async function validateAddressClientSide(address: string): Promise<Mapbox
       street = `${addressNumber} ${street}`;
     }
 
+    // Construct full address from components to ensure zip code is complete
+    const placeName = `${street}, ${components.city || ''}, ${components.state || ''} ${components.zip_code || ''}`;
+
     // Build suggestions from remaining results
     const suggestions: MapboxSuggestion[] = [];
     
     for (let i = 1; i < features.length; i++) {
       const feature = features[i];
-      let suggName = feature.place_name || '';
-      if (suggName.endsWith(', United States')) {
-        suggName = suggName.slice(0, -16);
+      const suggCoords = feature.geometry?.coordinates || [];
+      
+      // Parse components for this suggestion
+      const suggContext = feature.context || [];
+      const suggComponents = parseMapboxContext(suggContext);
+      
+      // Extract street address
+      let suggStreet = feature.text || '';
+      const suggAddressNumber = feature.address;
+      if (suggAddressNumber) {
+        suggStreet = `${suggAddressNumber} ${suggStreet}`;
       }
       
-      const suggCoords = feature.geometry?.coordinates || [];
+      // Construct full address from parsed components
+      const suggName = `${suggStreet}, ${suggComponents.city || ''}, ${suggComponents.state || ''} ${suggComponents.zip_code || ''}`;
+      
       suggestions.push({
         full_address: suggName,
-        street: '',
-        city: '',
-        state: '',
-        zip_code: '',
+        street: suggStreet,
+        city: suggComponents.city || '',
+        state: suggComponents.state || '',
+        zip_code: suggComponents.zip_code || '',
         latitude: suggCoords[1],
         longitude: suggCoords[0]
       });
