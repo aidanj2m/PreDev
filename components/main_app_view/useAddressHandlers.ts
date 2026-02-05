@@ -110,7 +110,7 @@ export function useAddressHandlers(
         console.log('Address added successfully with boundary data:', newAddress);
         
         // Fetch surrounding parcels if this is the first address
-        let surroundingParcels = null;
+        let surroundingParcels: any[] | null = null;
         if (addresses.length === 0) {
           console.log('Fetching surrounding parcels before map load...');
           try {
