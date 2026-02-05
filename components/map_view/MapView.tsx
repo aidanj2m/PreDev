@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import Map, { Source, Layer, MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import ParcelPreviewModal from '@/components/modals/ParcelPreviewModal';
@@ -9,6 +9,7 @@ import { MapViewProps } from './types';
 import { useEnvironmentalLayers } from './useEnvironmentalLayers';
 import { useParcels } from './useParcels';
 import { useMapInteraction } from './useMapInteraction';
+import { useViewportParcels } from './useViewportParcels';
 import {
   mainParcelFillLayer,
   mainParcelLineLayer,
@@ -18,8 +19,6 @@ import {
   wetlandsLineLayer,
   redevZonesFillLayer,
   redevZonesLineLayer,
-  nearbyParcelsFillLayer,
-  nearbyParcelsLineLayer,
   cafraCentersFillLayer,
   cafraCentersLineLayer,
   hydroStreamsLineLayer,
@@ -42,13 +41,46 @@ import {
   floodHazardLineLayer
 } from './layer-styles';
 
-export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddress }: MapViewProps) {
-  const mapRef = useRef<MapRef>(null);
+export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddress, preloadedSurroundingParcels }: MapViewProps) {
+  const mapRef = useRef<MapRef | null>(null);
+  const [isHovering, setIsHovering] = React.useState(false);
   
   // Custom hooks
   const envLayers = useEnvironmentalLayers(mapRef);
-  const { isLoadingBoundaries, mainParcels, surroundingParcels, handleMapClick } = useParcels(addresses, onAddAddress, onRemoveAddress);
-  const { hoveredParcelInfo, cursor, handleMouseMove, handleMouseLeave } = useMapInteraction();
+  const { isLoadingBoundaries, mainParcels, surroundingParcels, handleMapClick } = useParcels(addresses, onAddAddress, onRemoveAddress, preloadedSurroundingParcels);
+  const { hoveredParcelInfo, cursor, handleMouseMove, handleMouseLeave } = useMapInteraction(mapRef);
+  const { viewportParcels, handleViewportChange } = useViewportParcels(mapRef, mainParcels);
+
+  // Merge address-based surrounding parcels with viewport-fetched parcels
+  const mergedSurroundingParcels = useMemo(() => {
+    const mainFps = new Set(
+      mainParcels.features.map(f => {
+        const c = f.geometry.coordinates?.[0]?.[0];
+        return c ? `${c[0].toFixed(6)},${c[1].toFixed(6)}` : '';
+      })
+    );
+
+    const combined = [...surroundingParcels.features];
+    const existingFps = new Set(
+      combined.map(f => {
+        const c = f.geometry.coordinates?.[0]?.[0];
+        return c ? `${c[0].toFixed(6)},${c[1].toFixed(6)}` : '';
+      })
+    );
+
+    for (const f of viewportParcels.features) {
+      const c = f.geometry?.coordinates?.[0]?.[0];
+      const fp = c ? `${c[0].toFixed(6)},${c[1].toFixed(6)}` : '';
+      if (!existingFps.has(fp) && !mainFps.has(fp)) {
+        combined.push(f);
+      }
+    }
+
+    return {
+      type: 'FeatureCollection' as const,
+      features: combined.map((f, i) => ({ ...f, id: i }))
+    };
+  }, [surroundingParcels, viewportParcels, mainParcels]);
 
   // Calculate initial center from addresses (no auto-zoom)
   const validCoords = addresses.filter(a => a.latitude && a.longitude);
@@ -83,8 +115,15 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
             cursor={cursor}
             interactiveLayerIds={['main-parcels-fill', 'surrounding-parcels-fill']}
             onClick={handleMapClick}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            onMouseMove={(e) => {
+              handleMouseMove(e);
+              setIsHovering(!!(e.features && e.features.length > 0));
+            }}
+            onMouseLeave={() => {
+              handleMouseLeave();
+              setIsHovering(false);
+            }}
+            onMoveEnd={handleViewportChange}
           >
             {/* Wetlands */}
             {envLayers.showWetlands && (
@@ -182,16 +221,8 @@ export default function MapView({ addresses, onBack, onAddAddress, onRemoveAddre
               </Source>
             )}
 
-            {/* Nearby Parcels */}
-            {envLayers.showNearbyParcels && (
-              <Source id="nearby-parcels" type="geojson" data={envLayers.nearbyParcels}>
-                <Layer {...nearbyParcelsFillLayer} />
-                <Layer {...nearbyParcelsLineLayer} />
-              </Source>
-            )}
-
-            {/* Surrounding Parcels */}
-            <Source id="surrounding-parcels" type="geojson" data={surroundingParcels}>
+            {/* Surrounding Parcels (includes viewport-fetched parcels) */}
+            <Source id="surrounding-parcels" type="geojson" data={mergedSurroundingParcels}>
               <Layer {...surroundingParcelFillLayer} />
               <Layer {...surroundingParcelLineLayer} />
             </Source>

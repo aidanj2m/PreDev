@@ -37,11 +37,17 @@ export function useProjectData(
 
   useEffect(() => {
     if (currentProjectId) {
+      // Don't override loading state - address submission is in progress
+      // and will handle state transitions when the promise resolves
+      if (viewState === 'loading') return;
       loadProjectData(currentProjectId);
     } else {
-      setAddresses([]);
-      setViewState('input');
-      setShowInput(true);
+      // Only reset to input if we're not in loading state
+      if (viewState !== 'loading') {
+        setAddresses([]);
+        setViewState('input');
+        setShowInput(true);
+      }
     }
   }, [currentProjectId]);
 

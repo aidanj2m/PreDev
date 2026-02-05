@@ -16,6 +16,7 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [showInput, setShowInput] = useState(true);
   const [projectName, setProjectName] = useState<string>('');
+  const [preloadedSurroundingParcels, setPreloadedSurroundingParcels] = useState<any[] | null>(null);
   
   // Load project data
   useProjectData(
@@ -43,13 +44,33 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
     setViewState,
     setShowInput,
     onCreateProjectWithAddress,
-    onProjectChange
+    onProjectChange,
+    setPreloadedSurroundingParcels
   );
 
   // Simple view state handlers
   const handleViewMap = () => setViewState('viewing');
   const handleBackFromMap = () => setViewState('building');
   const handleAddAnother = () => setShowInput(true);
+
+  // Show loading view - must be checked BEFORE !currentProjectId guard
+  // because project creation happens inside the loading promise
+  if (viewState === 'loading' && loadingPromise) {
+    return (
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ffffff'
+      }}>
+        <LoadingView 
+          loadingPromise={loadingPromise}
+          onLoadingComplete={handleLoadingComplete}
+        />
+      </main>
+    );
+  }
 
   // If no project selected, show address input to create one
   if (!currentProjectId) {
@@ -99,24 +120,6 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
     );
   }
 
-  // Show loading view with 45-second animation
-  if (viewState === 'loading' && loadingPromise) {
-    return (
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#ffffff'
-      }}>
-        <LoadingView 
-          loadingPromise={loadingPromise}
-          onLoadingComplete={handleLoadingComplete}
-        />
-      </main>
-    );
-  }
-
   // Viewing state - show map with floating chatbot overlay
   if (viewState === 'viewing') {
     return (
@@ -139,6 +142,7 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
             onBack={handleBackFromMap} 
             onAddAddress={handleAddAddressFromMap}
             onRemoveAddress={handleRemoveAddress}
+            preloadedSurroundingParcels={preloadedSurroundingParcels}
           />
         </div>
 

@@ -21,7 +21,8 @@ export function useAddressHandlers(
   setViewState: (state: ViewState) => void,
   setShowInput: (show: boolean) => void,
   onCreateProjectWithAddress: () => Promise<string>,
-  onProjectChange: () => void
+  onProjectChange: () => void,
+  setPreloadedSurroundingParcels?: (parcels: any[] | null) => void
 ) {
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
   const [loadingPromise, setLoadingPromise] = useState<Promise<any> | null>(null);
@@ -108,6 +109,19 @@ export function useAddressHandlers(
         const newAddress = await addressesAPI.addToProject(projectId, validatedAddress);
         console.log('Address added successfully with boundary data:', newAddress);
         
+        // Fetch surrounding parcels if this is the first address
+        let surroundingParcels = null;
+        if (addresses.length === 0) {
+          console.log('Fetching surrounding parcels before map load...');
+          try {
+            const boundaryData = await addressesAPI.getBoundary(newAddress.id);
+            surroundingParcels = boundaryData.surrounding_parcels;
+            console.log(`Pre-loaded ${surroundingParcels?.length || 0} surrounding parcels`);
+          } catch (error) {
+            console.error('Error pre-fetching surrounding parcels:', error);
+          }
+        }
+        
         // Store the new address for later
         const updatedAddresses = [...addresses, newAddress];
         
@@ -124,7 +138,7 @@ export function useAddressHandlers(
         }
         
         // Return the data instead of setting state
-        return { newAddress, updatedAddresses };
+        return { newAddress, updatedAddresses, surroundingParcels };
       } catch (error) {
         console.error('Error adding address:', error);
         alert('Failed to add address. Please try again.');
@@ -246,6 +260,12 @@ export function useAddressHandlers(
         if (result && result.updatedAddresses) {
           // Update addresses state NOW (after loading complete)
           setAddresses(result.updatedAddresses);
+          
+          // Store preloaded surrounding parcels if available
+          if (result.surroundingParcels && setPreloadedSurroundingParcels) {
+            console.log('Storing preloaded surrounding parcels for map view');
+            setPreloadedSurroundingParcels(result.surroundingParcels);
+          }
         }
       } catch (error) {
         console.error('Error in loading complete:', error);

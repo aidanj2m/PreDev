@@ -29,6 +29,7 @@ export interface Address {
   latitude?: number;
   longitude?: number;
   boundary_geojson?: any;
+  surrounding_parcels_geojson?: any[];
   created_at: string;
 }
 

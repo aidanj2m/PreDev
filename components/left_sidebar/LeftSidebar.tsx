@@ -274,10 +274,11 @@ export default function LeftSidebar({
       {/* Projects Section */}
       <div style={{
         flex: 1,
-        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
-        marginTop: '32px'
+        marginTop: '32px',
+        minHeight: 0,
+        overflow: 'hidden'
       }}>
         <div style={{
           padding: '0 18px',
@@ -287,7 +288,8 @@ export default function LeftSidebar({
           color: '#9CA3AF',
           letterSpacing: '0.05em',
           opacity: isCollapsed ? 0 : 1,
-          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease'
+          transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease',
+          flexShrink: 0
         }}>
           Projects
         </div>
@@ -295,7 +297,10 @@ export default function LeftSidebar({
           padding: '0 8px',
           opacity: isCollapsed ? 0 : 1,
           transition: isCollapsed ? 'opacity 0.15s ease' : 'opacity 0.8s ease',
-          pointerEvents: isCollapsed ? 'none' : 'auto'
+          pointerEvents: isCollapsed ? 'none' : 'auto',
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0
         }}>
           <ProjectList
             currentProjectId={currentProjectId}

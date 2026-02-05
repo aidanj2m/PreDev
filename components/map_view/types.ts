@@ -14,6 +14,7 @@ export interface MapViewProps {
     boundary_geojson?: any;
   }) => void;
   onRemoveAddress?: (addressId: string) => void;
+  preloadedSurroundingParcels?: any[] | null;
 }
 
 export interface ParcelFeature {

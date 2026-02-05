@@ -7,7 +7,8 @@ import { parseBoundaryGeoJSON } from './wkt-parser';
 export function useParcels(
   addresses: Address[],
   onAddAddress?: (address: any) => void,
-  onRemoveAddress?: (addressId: string) => void
+  onRemoveAddress?: (addressId: string) => void,
+  preloadedSurroundingParcels?: any[] | null
 ) {
   const [isLoadingBoundaries, setIsLoadingBoundaries] = useState(false);
   const [mainParcels, setMainParcels] = useState<GeoJSONCollection>({ type: 'FeatureCollection', features: [] });
@@ -63,6 +64,73 @@ export function useParcels(
             return !matchesMain;
           })
         }));
+        
+        // Check if we need to load surrounding parcels for the first address
+        // First try to use preloaded data, then fetch if needed
+        if (addresses.length === 1 && surroundingParcels.features.length === 0) {
+          // Use preloaded data if available
+          if (preloadedSurroundingParcels && preloadedSurroundingParcels.length > 0) {
+            console.log('Using preloaded surrounding parcels...');
+            const surroundingFeatures: ParcelFeature[] = [];
+            preloadedSurroundingParcels.forEach((parcel: any, index: number) => {
+              if (parcel.properties?.is_main_parcel) return;
+
+              if (parcel.geometry && parcel.geometry.coordinates) {
+                surroundingFeatures.push({
+                  type: 'Feature',
+                  id: surroundingFeatures.length,
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: parcel.geometry.coordinates
+                  },
+                  properties: {
+                    ...parcel.properties,
+                    _isSurrounding: true,
+                    _index: index
+                  }
+                });
+              }
+            });
+            
+            setSurroundingParcels({ type: 'FeatureCollection', features: surroundingFeatures });
+            console.log(`✓ Loaded ${surroundingFeatures.length} preloaded surrounding parcels`);
+          } else {
+            // Fallback: fetch from API if no preloaded data
+            console.log('No preloaded data - fetching surrounding parcels...');
+            try {
+              const firstAddress = addresses[0];
+              const boundaryData = await addressesAPI.getBoundary(firstAddress.id);
+              
+              if (boundaryData.surrounding_parcels) {
+                const surroundingFeatures: ParcelFeature[] = [];
+                boundaryData.surrounding_parcels.forEach((parcel: any, index: number) => {
+                  if (parcel.properties?.is_main_parcel) return;
+
+                  if (parcel.geometry && parcel.geometry.coordinates) {
+                    surroundingFeatures.push({
+                      type: 'Feature',
+                      id: surroundingFeatures.length,
+                      geometry: {
+                        type: 'Polygon',
+                        coordinates: parcel.geometry.coordinates
+                      },
+                      properties: {
+                        ...parcel.properties,
+                        _isSurrounding: true,
+                        _index: index
+                      }
+                    });
+                  }
+                });
+                
+                setSurroundingParcels({ type: 'FeatureCollection', features: surroundingFeatures });
+                console.log(`✓ Loaded ${surroundingFeatures.length} surrounding parcels`);
+              }
+            } catch (error) {
+              console.error('Error fetching surrounding parcels:', error);
+            }
+          }
+        }
         
         setIsLoadingBoundaries(false);
         return;
@@ -152,7 +220,7 @@ export function useParcels(
     };
 
     loadBoundaries();
-  }, [addresses]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addresses, preloadedSurroundingParcels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle parcel clicks
   const handleMapClick = useCallback(async (event: MapLayerMouseEvent) => {
