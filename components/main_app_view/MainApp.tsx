@@ -19,7 +19,7 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
   const [preloadedSurroundingParcels, setPreloadedSurroundingParcels] = useState<any[] | null>(null);
   
   // Load project data
-  useProjectData(
+  const { isLoading: isLoadingProject } = useProjectData(
     currentProjectId,
     viewState,
     setAddresses,
@@ -115,6 +115,37 @@ export default function MainApp({ currentProjectId, onProjectChange, onCreatePro
             position="center"
             showHeader={true}
           />
+        </div>
+      </main>
+    );
+  }
+
+  // Loading existing project data
+  if (isLoadingProject && currentProjectId) {
+    return (
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#ffffff'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e5e5e5',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading project...</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </main>
     );

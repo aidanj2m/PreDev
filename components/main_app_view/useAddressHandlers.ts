@@ -115,7 +115,7 @@ export function useAddressHandlers(
           console.log('Fetching surrounding parcels before map load...');
           try {
             const boundaryData = await addressesAPI.getBoundary(newAddress.id);
-            surroundingParcels = boundaryData.surrounding_parcels;
+            surroundingParcels = boundaryData.surrounding_parcels ?? null;
             console.log(`Pre-loaded ${surroundingParcels?.length || 0} surrounding parcels`);
           } catch (error) {
             console.error('Error pre-fetching surrounding parcels:', error);
